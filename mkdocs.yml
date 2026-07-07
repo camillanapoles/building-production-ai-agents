@@ -1,0 +1,92 @@
+site_name: Building Production AI Agents
+site_description: Wiki completa da série "Building Production AI Agents" por The Daily Agent (dev.to) - 26 artigos sobre agentes de IA em produção
+site_author: The Daily Agent (curated wiki)
+repo_url: https://github.com/camillanapoles/building-production-ai-agents
+repo_name: building-production-ai-agents
+site_url: https://camillanapoles.github.io/building-production-ai-agents/
+
+theme:
+  name: material
+  language: en
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: amber
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: amber
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.indexes
+    - navigation.top
+    - toc.integrate
+    - search.suggest
+    - search.highlight
+  logo: assets/logo.svg
+  favicon: assets/favicon.png
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      linenums: true
+  - pymdownx.tabbed:
+      alternate: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - tables
+  - attr_list
+  - md_in_html
+
+plugins:
+  - search:
+      lang: en
+  - git-revision-date-localized:
+      enable_creation_date: true
+
+nav:
+  - Home: index.md
+  - Fundamentos:
+    - "01. God Agent Anti-Pattern": "01-god-agent-anti-pattern.md"
+    - "02. Amnesia e Memória": "02-ai-agent-amnesia-memory-patterns.md"
+    - "03. Um Prompt de Desastre": "03-ai-agent-one-prompt-away-disaster.md"
+    - "04. Espirais de Custo": "04-stop-ai-agent-cost-spirals.md"
+    - "05. Context Engineering": "05-context-engineering-ai-agents.md"
+    - "06. Workflows vs Agentes": "06-workflow-automation-vs-ai-agents.md"
+    - "07. Agent Washing": "07-agent-washing-code-level-tests.md"
+  - Arquitetura e Orquestração:
+    - "08. Multi-Agent Orchestration": "08-multi-agent-orchestration-patterns.md"
+    - "09. Testando Agentes": "09-test-ai-agents-before-burn-budget.md"
+    - "10. Por Que 90% Falham": "10-why-90-percent-ai-agent-projects-fail.md"
+    - "11. Agentes vs Workflows": "11-agents-vs-workflows-decision-framework.md"
+    - "12. Event-Driven Agents": "12-event-driven-ai-agents-patterns.md"
+    - "13. Error Handling Python": "13-ai-agent-error-handling-resilience-python.md"
+  - MCP (Model Context Protocol):
+    - "15. MCP Guide Completo": "15-building-production-ai-agents-mcp-guide.md"
+    - "16. Primeiro MCP Server Python": "16-build-first-mcp-server-python.md"
+    - "26. Custom MCP Servers": "26-building-custom-mcp-servers-guide.md"
+  - Produção:
+    - "14. Unavailable": "14-unavailable.md"
+    - "17. Structured Outputs vs Tool Calling": "17-structured-outputs-vs-tool-calling.md"
+    - "18. Error Handling 3AM": "18-ai-agent-error-handling-patterns-3am.md"
+    - "19. Frameworks Python 2026": "19-best-python-frameworks-ai-agents-2026.md"
+    - "20. Observability": "20-ai-agent-observability-4-pillars.md"
+    - "21. Agent Harness Scratch": "21-building-ai-agent-harness-scratch.md"
+    - "22. Deferred Tool Loading": "22-deferred-tool-loading-ai-agents.md"
+    - "23. Ferramentas Open Source": "23-open-source-tools-testing-ai-agents.md"
+    - "24. Tools After 100 Deployments": "24-production-grade-tools-ai-agents-100-deployments.md"
+    - "25. 5-Layer Security Model": "25-5-layer-security-model-ai-agents.md"
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/camillanapoles
