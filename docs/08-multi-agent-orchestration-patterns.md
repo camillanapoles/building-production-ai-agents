@@ -60,6 +60,7 @@ When to use it: Subtasks are genuinely independent. Speed matters more than toke
 
 When to avoid it: Subtasks depend on each other's output. Your aggregator is weak -- a bad synthesizer loses information or introduces contradictions.
 
+```python
 Cost profile: Total tokens = (N agents x input tokens) + aggregation. More predictable than sequential, but scales linearly with agent count.
 
 Pattern 3: Router / Handoff
@@ -71,6 +72,7 @@ User Input --> [Router] --> [Email Agent]
 --> [Calendar Agent]
 --> [Code Review Agent]
 
+```
 
 When to use it: Requests fall into distinct categories. Each category needs different tools, different prompts, different behavior. You cannot predict the category upfront.
 
@@ -78,6 +80,7 @@ When to avoid it: Every request needs all specialists to contribute. That is fan
 
 Cost profile: Cheapest multi-agent pattern. One small routing call + one specialist call. Total overhead is just the router's classification cost.
 
+```python
 Pattern 4: Hierarchical (Manager + Teams)
 
 A manager agent decomposes a complex task, delegates subtasks to team leads, and team leads coordinate workers. Each level adds abstraction: the manager reasons about strategy, team leads handle tactics, workers execute.
@@ -87,6 +90,7 @@ A manager agent decomposes a complex task, delegates subtasks to team leads, and
 |-- [Research Lead] --> [Web Searcher] --> [Doc Analyzer]
 |-- [Writing Lead]  --> [Drafter] --> [Editor]
 
+```
 
 When to use it: The task spans multiple domains. No single agent can hold the full context. You need 10+ agents organized into logical groups.
 
@@ -109,6 +113,7 @@ The Code: A Framework-Agnostic Multi-Agent Router
 Here is the router/handoff pattern in plain Python. No framework dependencies. Works with any LLM API that supports function calling.
 
 
+```python
 import json
 from openai import OpenAI
 
@@ -169,6 +174,7 @@ if category == "unknown":
 return "I'm not sure what you need. Could you clarify?"
 return run_specialist(category, user_input)
 
+```
 
 Notice three things:
 
@@ -196,8 +202,10 @@ Total: 4,500 input tokens (4.5x a single-agent call)
 Fan-out (3 agents, 1K input):
 
 Each agent: 1,000 input tokens
+```python
 Aggregator: 1,000 + (3 x 500) = 2,500 input tokens
 Total: 5,500 input tokens (5.5x a single-agent call)
+```
 
 Group chat (the pattern most articles recommend first but should be recommended last):
 
@@ -248,7 +256,6 @@ Skip steps 3-5 until step 2 demonstrably fails. Most production agent systems ne
 
 This is part of the Building Production AI Agents series. Previous: Why Your AI Workflow Breaks at Scale. Next up: evaluation pipelines that catch agent regressions before your users do.
 
-Building Production AI Agents (26 Part Series)
 The God Agent Anti-Pattern: Why Your AI Breaks at 20 Tools
 Your AI Agent Has Amnesia: Fix It With These 4 Memory Patterns
 ...
@@ -256,12 +263,3 @@ Your AI Agent Has Amnesia: Fix It With These 4 Memory Patterns
 Multi-Agent Orchestration: A Guide to Patterns That Work
 The 5-Layer Security Model Every AI Agent Needs in Production
 Building Custom MCP Servers: A Developer's Guide to Production-Grade AI Agent Tools
-DEV Community
-
-Build Apps with Google AI Studio 🧱
-
-This track will guide you through Google AI Studio's new "Build apps with Gemini" feature, where you can turn a simple text prompt into a fully functional, deployed web application in minutes.
-
-Read more →
-
-Read More

@@ -44,6 +44,7 @@ Download and execute malicious payloads
 NVIDIA's recommendation is clear: network connections created by sandbox processes should not be permitted without manual approval. Tightly scoped allowlists enforced through HTTP proxy, IP, or port-based controls reduce user interaction and approval fatigue.
 
 
+```python
 from dataclasses import dataclass
 import httpx
 
@@ -58,6 +59,7 @@ if self.default_action == \"deny\":
 # Check allowlist first
 for domain in self.allowed_domains:
 if domain in url:
+```
 return True, \"allowed\"
 # Check blocklist for logging
 for pattern in selfblocked_patterns:
@@ -66,6 +68,7 @@ return False, f\"blocked: matches pattern {pattern}\"
 return False, \"blocked: default-deny\"
 return True, \"allowed\"
 
+```python
 # Production example
 production_policy = NetworkPolicy(
 allowed_domains=[
@@ -86,6 +89,7 @@ if not is_allowed:
 raise PermissionError(f\"Network access denied: {reason}\")
 return httpx.get(url, timeout=10.0)
 
+```
 
 The principle: Every outbound connection your agent makes is a potential data exfiltration path. Default-deny + explicit allowlist is the only safe posture.
 
@@ -98,6 +102,7 @@ Block writes outside the agent's workspace.
 Writing files outside of an active workspace is a significant risk. Files such as ~/.zshrc are executed automatically and can result in both RCE and sandbox escape. URLs in various key files, such as ~/.gitconfig or ~/.curlrc, can be overwritten to redirect sensitive data to attacker-controlled locations.
 
 
+```python
 from pathlib import Path
 import os
 
@@ -105,9 +110,11 @@ def validate_file_access(filepath: str, workspace: str, mode: str = \"read\") ->
 \"\"\"Validate file access against workspace boundaries.\"\"\"
 target = Path(filepath).resolve()
 ws = Path(workspace).resolve()
+```
 
 # Resolve symlinks and relative paths
 try:
+```python
 target.relative_to(ws)
 except ValueError:
 return False, f\"Path outside workspace: {filepath}\"
@@ -139,6 +146,7 @@ return {\"error\": reason}
 Path(path).write_text(content, encoding=\"utf-8\")
 return {\"status\": \"success\", \"path\": path}
 
+```
 
 Three rules:
 
@@ -155,6 +163,7 @@ The SQL injection of the AI era.
 Prompt injection exploits the fundamental design of LLMs: they cannot reliably distinguish between instructions from the developer and instructions embedded in user input. You need defense in depth — pattern matching, delimiter-based separation, and LLM-as-judge.
 
 
+```python
 import re
 from typing import Tuple
 
@@ -213,6 +222,7 @@ wrap_external_data(doc[\"content\"], doc[\"source\"])
 for doc in retrieved_docs
 )
 
+```
 
 The delimiter approach is underrated. Wrapping external content in XML-like tags with explicit instructions that the content is **data, not instructions, gives the LLM a structural cue it can use to separate trusted instructions from untrusted data.
 
@@ -223,6 +233,7 @@ Before any tool fires, validate.
 Your agent decidess which tool to call. You must decide whether that tool is allowed to run.
 
 
+```python
 from typing import Any, Callable
 from dataclasses import dataclass
 
@@ -292,13 +303,16 @@ return {\"error\": reason}
 gate.record_call(tool_name)
 return call_actual_t(tool_name, **arguments)
 
+```
 
 Four validation layers, each catching a different failure class:
 
 Schema validation — Is the tool registered? Does it exist?
+```python
 Call budget — Has this tool been called too many times? (prevents infinite tool loops)
 Approval gates — Does this tool require human approval? (for delete, payment, deploy)
 Category-specific rules — Dangerous categories get extra checks
+```
 
 This pairs directly with the MCP tool design work: the tool description tells the LLM when to call it, but the gate decides whether it's allowed to run.
 
@@ -311,6 +325,7 @@ Standard application monitoring doesn't translate cleanly to agentic systems. Ag
 Effective monitoring requires tracing the full reasoning chain: which tools were called, in what order, with what inputs, and what the agent's stated rationale was at each step.
 
 
+```python
 import json
 import hashlib
 import time
@@ -386,6 +401,7 @@ data = json.load(f)
 expected_hash = hashlib.sha256(json.dumps(data[\"events\"], indent=2).encode()).hexdigest()
 return data[\"hash_chain\"] == expected_hash
 
+```
 
 The key design decisions:
 
@@ -444,19 +460,9 @@ The production agent journey doesn't start with making the agent smarter. It sta
 
 This article is part of the Building Production AI Agents series on Dev.to, covering the real engineering challenges of running autonomous AI agents.
 
-Building Production AI Agents (26 Part Series)
 The God Agent Anti-Pattern: Why Your AI Breaks at 20 Tools
 Your AI Agent Has Amnesia: Fix It With These 4 Memory Patterns
 ...
 22 more parts...
 The 5-Layer Security Model Every AI Agent Needs in Production
 Building Custom MCP Servers: A Developer's Guide to Production-Grade AI Agent Tools
-DEV Community
-
-Build Apps with Google AI Studio 🧱
-
-This track will guide you through Google AI Studio's new \"Build apps with Gemini\" feature, where you can turn a simple text prompt into a fully functional, deployed web application in minutes.
-
-Read more →
-
-Read More

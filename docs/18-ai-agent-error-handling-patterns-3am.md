@@ -29,6 +29,7 @@ The Solution: Quality-Aware Circuit BREAKER
 A circuit breaker for agents needs to track quality failures: outputs that violate schema, fail semantic invariants, or produce unsafe actions — even when the API itself succeeds.
 
 
+```python
 import time
 from enum import Enum
 from dataclasses import dataclass, field
@@ -68,17 +69,21 @@ if elapsed >= self.reset_timeout:
 self.state = CircuitState.HALF_OPEN
 return True  # One probe request
 return False  # Circuit is open, reject
+```
 
 # Half-open: allow exactly one probe
 return True
 
+```python
 def should_block(self) -> bool:
 return not self.allow_request()
 
+```
 
 Usage in an agent loop:
 
 
+```python
 breaker = QualityCircuitBreaker(failure_threshold=3, reset_timeout=30.0)
 
 while agent_running:
@@ -100,6 +105,7 @@ else:
 breaker.record_success()
 process_response(response)
 
+```
 
 Key insight: When the circuit opens, stop. Don't burn tokens on a model producing garbage. Wait for the cooldown, send one probe request, and if it passes schema validation, close the circuit.
 
@@ -114,6 +120,7 @@ The Rule
 Never let an agent's output directly trigger a side effect. Always validate before execution.
 
 
+```python
 from typing import Any
 from dataclasses import dataclass
 import json
@@ -151,6 +158,7 @@ return False, "Agent cannot access production_billing"
 
 return True, "OK"
 
+```
 
 Three layers of validation, each catching a different failure class:
 
@@ -161,6 +169,7 @@ Boundary enforcement — Is the agent operating within its allowed scope? Cross-
 This gates every tool call before it executes. No separate validation function to remember to call — it's in the critical path.
 
 
+```python
 gate = ValidationGate()
 
 def execute_tool_call(raw_llm_output: str):
@@ -174,6 +183,7 @@ return f"Action blocked: {reason}. Please revise."
 # Only reach here after validation passes
 return run_actual_tool(call)
 
+```
 
 Design principle: Constrain what the agent can do, and you prevent most errors at the source. This pairs directly with the insight from tool design work — splitting one monolithic tool into eight focused tools eliminates most validation failures before they can occur.
 
@@ -188,6 +198,7 @@ The Solution: Checkpoint-Then-Execute with Compensation Actions
 Borrowing from the saga pattern in distributed systems, each step records its completion before execution and defines a compensation action for rollback.
 
 
+```python
 from dataclasses import dataclass
 from enum import Enum
 from typing import Callable, Optional
@@ -239,11 +250,13 @@ def execute(self, steps: list[SagaStep]) -> dict[str, str]:
 completed_steps = []
 
 for step in steps:
+```
 if self._is_completed(step.name):
 # Idempotent: skip already-completed steps on retry
 continue
 
 try:
+```python
 result = step.execute()
 self._record_checkpoint(step.name, str(result))
 completed_steps.append(step)
@@ -294,15 +307,18 @@ SagaStep("send_notification", execute=send_notification, compensate=send_correct
 
 saga.execute(steps)
 
+```
 
 Classify every step:
 
+```python
 Read-only — safe to retry freely (fetches, queries)
 Pure function — safe to retry (transforms, computations)
 Reversible — can undo (delete what you created)
 Compensatable — can't undo but can correct (send a follow-up notification)
 Irreversible — can't undo at all (payment processed). These need the most validation before execution.
 Pattern 4: Budget Guardrails for Runaway Loops
+```
 
 Agents can enter reasoning loops. The model keeps calling tools, generating responses, re-evaluating — never reaching a terminal state. The tokens pile up. The bill climbs. Nothing crashes, which is the problem.
 
@@ -311,6 +327,7 @@ Token Budget
 A hard cap on tokens per agent session. When the budget is exhausted, the agent must stop and either return results so far or escalate.
 
 
+```python
 @dataclass
 class TokenBudget:
 max_tokens: int = 50_000  # Set based on your cost tolerance
@@ -331,10 +348,12 @@ def track(self, response_text: str):
 self.used_tokens += len(response_text) // 4
 
 Cycle Budget
+```
 
 Beyond tokens, limit the number of reasoning cycles (turns) the agent can take. This prevents infinite tool-call loops even if each individual call is cheap.
 
 
+```python
 @dataclass
 class CycleBudget:
 max_cycles: int = 15
@@ -348,10 +367,12 @@ return self.current_cycle <= self.max_cycles
 def remaining(self) -> int:
 return max(0, self.max_cycles - self.current_cycle)
 
+```
 
 Integrated into an agent loop:
 
 
+```python
 token_budget = TokenBudget(max_tokens=30_000)
 cycle_budget = CycleBudget(max_cycles=12)
 
@@ -377,6 +398,7 @@ token_budget.track(llm_response_text)
 if cycle_budget.remaining() <= 3:
 logger.info(f"Agent in danger zone: {cycle_budget.remaining()} cycles left")
 
+```
 
 These budgets protect against the failure mode where an agent "works" perfectly — no exceptions, no crashes — while slowly burning through your API budget.
 
@@ -390,6 +412,7 @@ Ask the model for its confidence level alongside its reasoning. Below a threshol
 
 
 ESCALATION_THRESHOLD = 0.7
+```python
 HIGH_RISK_ACTIONS = {"delete_production_data", "send_customer_email",
 "modify_infrastructure", "approve_payment"}
 
@@ -411,10 +434,12 @@ logger.warning(f"Escalating: {', '.join(reasons)}")
 return True
 
 return False
+```
 
 # In the agent loop:
 if should_escalate(call.tool_name, parsed.confidence, validation_reason):
 escalation_queue.put({
+```python
 "tool": call.tool_name,
 "params": call.parameters,
 "model_confidence": parsed.confidence,
@@ -426,10 +451,12 @@ else:
 response = execute_tool_call(call)
 
 The Escalation Queue
+```
 
 Persisted escalation means it survives crashes, restarts, and redeployments. A simple file-backed queue works:
 
 
+```python
 import json
 from pathlib import Path
 
@@ -460,6 +487,7 @@ self.path.write_text(json.dumps(items, indent=2))
 Principle: The agent should stop deciding and start asking. Define clear escalation criteria upfront — action type, confidence threshold, validation failure patterns — and honor them. Nothing erodes trust in an agent faster than an autonomous mistake that a human would have caught in three seconds.
 
 Putting It All Together
+```
 
 These five patterns form layers:
 
@@ -486,7 +514,6 @@ Define escalation criteria before writing agent code. If you can't state when a 
 
 The production agent journey doesn't start with making the agent smarter. It starts with making the agent reliable. Do that, and the smartness will follow.
 
-Building Production AI Agents (26 Part Series)
 The God Agent Anti-Pattern: Why Your AI Breaks at 20 Tools
 Your AI Agent Has Amnesia: Fix It With These 4 Memory Patterns
 ...
@@ -494,12 +521,3 @@ Your AI Agent Has Amnesia: Fix It With These 4 Memory Patterns
 5 AI Agent Error Handling Patterns That Keep Your Agent Running at 3 AM
 The 5-Layer Security Model Every AI Agent Needs in Production
 Building Custom MCP Servers: A Developer's Guide to Production-Grade AI Agent Tools
-DEV Community
-
-Build Apps with Google AI Studio 🧱
-
-This track will guide you through Google AI Studio's new "Build apps with Gemini" feature, where you can turn a simple text prompt into a fully functional, deployed web application in minutes.
-
-Read more →
-
-Read More

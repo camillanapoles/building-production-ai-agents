@@ -27,6 +27,7 @@ Why it fails: Large language models degrade predictably as context grows. More t
 The fix: Decompose into specialist agents.
 
 
+```python
 from dataclasses import dataclass
 from enum import Enum
 
@@ -77,6 +78,7 @@ if any(kw in task_lower for kw in keywords):
 return agent
 return agents[0]  # fallback to first agent
 
+```
 
 The key insight: a router choosing between 4 specialist agents is a dramatically simpler problem than one agent choosing between 20 tools. Each specialist has 3-5 tools and a focused system prompt under 500 tokens. Routing accuracy stays above 95%, and each specialist performs better because its context is not diluted.
 
@@ -93,6 +95,7 @@ An agent without error recovery treats every failure as fatal. One API timeout k
 The fix: Circuit breaker pattern for agent tool calls.
 
 
+```python
 import time
 import random
 from typing import Callable, Any
@@ -121,10 +124,12 @@ raise RuntimeError(
 f\"Circuit open. Tool unavailable. \"
 f\"Retry after {self.reset_timeout}s.\"
 )
+```
 
 # Attempt with exponential backoff
 for attempt in range(self.max_retries):
 try:
+```python
 result = func(*args, **kwargs)
 self._on_success()
 return result
@@ -163,6 +168,7 @@ if fallback:
 return fallback(*args, **kwargs)
 return {\"error\": \"Tool unavailable\", \"action\": \"escalate_to_human\"}
 
+```
 
 The pattern is simple: retry with backoff for transient failures, trip the circuit breaker for persistent failures, and always have a fallback path — even if that fallback is \"tell the user you can't do this right now.\" An agent that gracefully degrades is infinitely more useful than one that crashes silently.
 
@@ -175,6 +181,7 @@ The symptoms are subtle at first: the agent \"forgets\" its system prompt constr
 The fix: Tiered memory with context pruning.
 
 
+```python
 from dataclasses import dataclass, field
 from typing import Optional
 import json
@@ -214,9 +221,11 @@ key_points.append(f\"- [{msg['role']}]: {content}\")
 addition = \"\
 \".join(key_points)
 self.conversation_summary += f\"\
+```
 {addition}\"
 # Cap summary length too
 if len(self.conversation_summary) > 2000:
+```python
 self.conversation_summary = self.conversation_summary[-2000:]
 
 def build_context(self, max_tokens: int = 8000) -> list[dict]:
@@ -233,10 +242,12 @@ context.append({
 \"role\": \"system\",
 \"content\": f\"Current task: {self.current_task}\"
 })
+```
 
 # Tier 2: Summary + recent messages
 if self.conversation_summary:
 context.append({
+```python
 \"role\": \"system\",
 \"content\": f\"Conversation history summary:\
 {self.conversation_summary}\"
@@ -253,6 +264,7 @@ def recall(self, key: str) -> Optional[str]:
 \"\"\"Retrieve from long-term memory on demand.\"\"\"
 return self.persistent_store.get(key)
 
+```
 
 The principle: system instructions and the current task are always in context (Tier 1). Recent conversation is kept but pruned on a rolling basis (Tier 2). Everything else is stored externally and retrieved only when needed (Tier 3). This keeps context usage predictable and prevents the slow degradation that kills long-running agents.
 
@@ -267,6 +279,7 @@ The numbers are sobering. One widely cited production report showed monthly runn
 The fix: Step limits and budget tripwires.
 
 
+```python
 import time
 from dataclasses import dataclass, field
 
@@ -295,16 +308,20 @@ self._step_count += 1
 self._total_cost += step_cost
 if tool_name:
 self._tool_history.append(tool_name)
+```
 
 # Check step limit
 if self._step_count > self.max_steps:
+```python
 raise BudgetExceeded(
 f\"Step limit reached ({self.max_steps}). \"
 f\"Agent terminated to prevent runaway.\"
 )
+```
 
 # Check cost cap
 if self._total_cost > self.max_cost_usd:
+```python
 raise BudgetExceeded(
 f\"Cost limit reached (${self.max_cost_usd:.2f}). \"
 f\"Spent: ${self._total_cost:.4f}\"
@@ -349,6 +366,7 @@ save_partial_results()
 notify_user(f\"Task incomplete: {e}\")
 break
 
+```
 
 Four guardrails in one class: step count (prevents infinite loops), cost cap (prevents budget blowouts), runtime limit (prevents hung agents), and loop detection (catches the agent hammering the same tool). Every production agent needs all four.
 
@@ -363,6 +381,7 @@ This is not just a debugging problem. It is a trust problem. If you cannot expla
 The fix: Structured step logging.
 
 
+```python
 import json
 import time
 from dataclasses import dataclass, field, asdict
@@ -461,6 +480,7 @@ result = tracer.finish(status=\"completed\")
 # Output: {\"event\": \"agent_complete\", \"total_steps\": 2,
 #          \"total_cost_usd\": 0.009, \"errors\": []}
 
+```
 
 Every step gets a structured log entry with what happened, what it cost, and how long it took. When something breaks at 3 AM, you do not have to guess — you replay the trace and see exactly which step failed and why. This is also how you build the evaluation datasets that let you improve the agent over time.
 
@@ -476,11 +496,13 @@ L4\tTrusted autonomous operation\tRare — requires all patterns + evals\tFull o
 
 Quick self-assessment — answer honestly:
 
+```python
 Does your agent have fewer than 8 tools? (Scope)
 Does every tool call have retry + fallback logic? (Error recovery)
 Can you tell me how many tokens your agent uses per task? (Observability)
 Is there a hard kill switch for cost/steps? (Budget control)
 Does conversation context get pruned automatically? (Memory management)
+```
 
 If you answered \"no\" to three or more, your agent is likely at L1-L2 regardless of how good the demo looks. The good news: each fix is independent. Start with whatever is causing the most pain — usually error recovery (#2) or budget controls (#4) — and work up.
 
@@ -502,7 +524,6 @@ Which failure mode killed your last agent project? Drop it in the comments — I
 
 This is part of the Building Production AI Agents series. Previously: How to Test AI Agents Before They Burn Your Budget, Multi-Agent Orchestration: Patterns That Work, Context Engineering for AI Agents, and How to Stop AI Agent Cost Spirals.
 
-Building Production AI Agents (26 Part Series)
 The God Agent Anti-Pattern: Why Your AI Breaks at 20 Tools
 Your AI Agent Has Amnesia: Fix It With These 4 Memory Patterns
 ...
@@ -510,12 +531,3 @@ Your AI Agent Has Amnesia: Fix It With These 4 Memory Patterns
 Why 90% of AI Agent Projects Fail (and the Patterns That Fix It)
 The 5-Layer Security Model Every AI Agent Needs in Production
 Building Custom MCP Servers: A Developer's Guide to Production-Grade AI Agent Tools
-DEV Community
-
-Build Apps with Google AI Studio 🧱
-
-This track will guide you through Google AI Studio's new \"Build apps with Gemini\" feature, where you can turn a simple text prompt into a fully functional, deployed web application in minutes.
-
-Read more →
-
-Read More

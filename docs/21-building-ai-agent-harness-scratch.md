@@ -33,6 +33,7 @@ The Minimal Agent Harness
 Let's start with the smallest useful version. A harness needs three things: a model interface, a tool registry, and a loop.
 
 
+```python
 import json
 from typing import Callable, Any
 from dataclasses import dataclass, field
@@ -92,10 +93,12 @@ return \"Max iterations reached.\"
 That's the skeleton. It loops: call model, check for tool calls, execute, feed back. Seven lines of core logic. It works for demos. It breaks in production. Let's see why.
 
 Problem 1: The Tool Registry Lies
+```
 
 You register a tool, the agent calls it, and it crashes because input validation is wrong. The tool description promised certain parameters, the model complied, but the underlying function has tighter requirements. This isn't the model's fault — it's a harness problem: the tool registry should validate before dispatch.
 
 
+```python
 class ToolRegistry:
 def __init__(self):
 self.tools: dict[str, Tool] = {}
@@ -121,6 +124,7 @@ def execute(self, tool_name: str, arguments: dict) -> Any:
 self.call_counts[tool_name] += 1
 return self.tools[tool_name].fn(**arguments)
 
+```
 
 The registry acts as a gatekeeper, not just a dispatcher. Before any tool fires, the harness validates existence, required fields, type correctness, and hallucinated parameters. This catches 60-70% of tool-call errors before they reach application code.
 
@@ -129,6 +133,7 @@ Problem 2: Memory Bloat Kills Context
 Ten turns in, the conversation contains the original prompt, four tool call/response pairs, and a partial draft. The context window is filling up. By turn 20, the model starts forgetting the system prompt. The solution is intelligent context management: compress what you don't need, preserve what you do.
 
 
+```python
 import tiktoken
 from dataclasses import dataclass
 
@@ -175,6 +180,7 @@ compressed = [system_msg] + compressed
 compressed.extend(recent)
 return compressed
 
+```
 
 Treat the context window like OS memory: recent messages are your hot cache, old messages are swap space, and the system prompt is kernel memory — never page it out.
 
@@ -183,6 +189,7 @@ Problem 3: The Loop Runs Forever
 The model enters a reasoning spiral. It calls search_database, gets a result, calls it again with slightly different parameters, repeats indefinitely. Tokens pile up. Budget enforcement is the most critical guardrail, and it belongs in the harness, not the prompt.
 
 
+```python
 from dataclasses import dataclass
 import time
 
@@ -220,6 +227,7 @@ if count >= self.config.max_per_tool_calls:
 return f\"Per-tool limit: '{tool}' called {count} times\"
 return None
 
+```
 
 Four budgets, any of which stops the agent before costs spiral: token budget, tool call budget, time budget, and per-tool budget.
 
@@ -228,6 +236,7 @@ Problem 4: Errors Swallowed, Not Handled
 A tool call raises ConnectionError. The harness catches it, returns \"Error: ConnectionError\", and the model gets confused. It doesn't know if it should retry, try a different tool, or give up. Error formatting is an agent design problem. The model needs structured error messages that tell it what went wrong and what to do.
 
 
+```python
 from enum import Enum
 from dataclasses import dataclass
 
@@ -260,10 +269,12 @@ Unavailable: Weather service down → \"Inform the user data is unavailable.\"
 A bare exception traceback tells the model nothing. A structured error with a suggested action gives it a decision tree.
 
 Problem 5: The Harness Has No State
+```
 
 The minimal harness is stateless between runs. For cross-session persistence, you need a state layer:
 
 
+```python
 import json
 import sqlite3
 from datetime import datetime, UTC
@@ -301,6 +312,7 @@ total = self.db.execute(\"SELECT COUNT(*) FROM tool_invocations WHERE session_id
 rate = self.db.execute(\"SELECT AVG(success) FROM tool_invocations WHERE session_id = ?\", (session_id,)).fetchone()[0] or 0
 return {\"total_invocations\": total, \"success_rate\": round(rate * 100, 1)}
 
+```
 
 The state layer gives you session persistence, tool invocation audit logs, and built-in analytics — essential for debugging failed sessions.
 
@@ -359,7 +371,6 @@ The agent harness isn't glamorous. But it's the difference between an agent that
 
 This article is part of the Building Production AI Agents series on Dev.to.
 
-Building Production AI Agents (26 Part Series)
 The God Agent Anti-Pattern: Why Your AI Breaks at 20 Tools
 Your AI Agent Has Amnesia: Fix It With These 4 Memory Patterns
 ...
@@ -367,12 +378,3 @@ Your AI Agent Has Amnesia: Fix It With These 4 Memory Patterns
 Building an AI Agent Harness from Scratch: The Architecture Between LLM and Agent
 The 5-Layer Security Model Every AI Agent Needs in Production
 Building Custom MCP Servers: A Developer's Guide to Production-Grade AI Agent Tools
-DEV Community
-
-Build Apps with Google AI Studio 🧱
-
-This track will guide you through Google AI Studio's new \"Build apps with Gemini\" feature, where you can turn a simple text prompt into a fully functional, deployed web application in minutes.
-
-Read more →
-
-Read More

@@ -224,7 +224,6 @@ The good news: open-source evaluation tools in 2026 are mature enough that you h
 
 The agents that ship reliably are the ones that get tested before they ship. Not after the first angry customer email.
 
-Building Production AI Agents (26 Part Series)
 The God Agent Anti-Pattern: Why Your AI Breaks at 20 Tools
 Your AI Agent Has Amnesia: Fix It With These 4 Memory Patterns
 ...
@@ -232,12 +231,3 @@ Your AI Agent Has Amnesia: Fix It With These 4 Memory Patterns
 5 Open-Source Tools for Testing AI Agents Before They Break Production
 The 5-Layer Security Model Every AI Agent Needs in Production
 Building Custom MCP Servers: A Developer's Guide to Production-Grade AI Agent Tools
-DEV Community
-
-Build Apps with Google AI Studio 🧱
-
-This track will guide you through Google AI Studio's new "Build apps with Gemini" feature, where you can turn a simple text prompt into a fully functional, deployed web application in minutes.
-
-Read more →
-
-Read More

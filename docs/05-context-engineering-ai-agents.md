@@ -37,6 +37,7 @@ The Context Budget: Know What You're Spending
 Before optimizing anything, you need to measure. A context budget calculator tells you exactly how much space each component consumes and how much remains for the model to work with.
 
 
+```python
 import tiktoken
 
 def calculate_context_budget(
@@ -94,6 +95,7 @@ retrieved_docs=[\"Document chunk...\" * 50 for _ in range(5)],
 for key, value in budget.items():
 print(f\"{key}: {value}\")
 
+```
 
 The rule of thumb: if your context is more than 60% full before the user's current message, you have a context engineering problem. Run this calculator on your agent and you'll likely be surprised how much space tools and history consume.
 
@@ -106,6 +108,7 @@ Strategy 1: Sliding Window with Summarization
 The simplest and highest-impact strategy. Keep the last N conversation turns verbatim (the model needs recent context for coherence), and compress everything older into a summary.
 
 
+```python
 from openai import OpenAI
 
 client = OpenAI()
@@ -153,6 +156,7 @@ return [
 # After: 1 summary (~200 tokens) + 6 recent messages (~3,000 tokens)
 # Savings: ~17,000 tokens per agent call
 
+```
 
 When to use: Long-running chat agents, multi-step workflows, any agent that accumulates more than 10 conversation turns.
 
@@ -168,8 +172,10 @@ Instead of injecting all retrieved results, score them by relevance and only inc
 
 Embedding similarity: rank chunks by cosine similarity to the current query
 Recency weighting: boost documents updated recently if freshness matters
+```python
 Source priority: rank authoritative sources (official docs) above informal ones (forum posts)
 Threshold filtering: drop anything below a relevance score of 0.7 (tune this empirically)
+```
 
 For long documents that pass the threshold, extract only the most relevant paragraphs rather than including the full text. A 2,000-token document often has 200 tokens of actually useful content for the current step.
 
@@ -184,6 +190,7 @@ If your agent has 15+ tools, their definitions alone can consume 5,000-10,000 to
 The fix: don't load all tools into every call. Use a lightweight classifier to predict which tools are relevant for the current step, and inject only those.
 
 
+```python
 from openai import OpenAI
 import json
 
@@ -247,6 +254,7 @@ max_tools=3,
 )
 # Returns: [query_database, read_file] -- saves ~4,000 tokens
 
+```
 
 When to use: Agents with more than 10 tools, especially those using MCP where users can plug in arbitrary tool sets. If you've read our piece on MCP Tool Overload, this is the code-level fix.
 
@@ -312,7 +320,6 @@ Context engineering is the missing piece between \"my agent works in demos\" and
 
 This is part of the Building Production AI Agents series. Previous: How to Stop AI Agent Cost Spirals Before They Start. See also: MCP Tool Overload: Why More Tools Make Your Agent Worse.
 
-Building Production AI Agents (26 Part Series)
 The God Agent Anti-Pattern: Why Your AI Breaks at 20 Tools
 Your AI Agent Has Amnesia: Fix It With These 4 Memory Patterns
 ...
@@ -320,12 +327,3 @@ Your AI Agent Has Amnesia: Fix It With These 4 Memory Patterns
 Context Engineering for AI Agents: A Practical Guide
 The 5-Layer Security Model Every AI Agent Needs in Production
 Building Custom MCP Servers: A Developer's Guide to Production-Grade AI Agent Tools
-DEV Community
-
-Build Apps with Google AI Studio 🧱
-
-This track will guide you through Google AI Studio's new \"Build apps with Gemini\" feature, where you can turn a simple text prompt into a fully functional, deployed web application in minutes.
-
-Read more →
-
-Read More

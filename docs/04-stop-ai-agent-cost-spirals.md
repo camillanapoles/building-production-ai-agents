@@ -19,6 +19,7 @@ The simplest cost control is a hard ceiling. Before any agent run starts, set a 
 Most teams skip this because they assume costs are unpredictable. They're not. After a few runs, you can estimate expected token usage for each task type. Set the budget at 3x your expected usage to handle variance, and you'll catch runaways without blocking legitimate work.
 
 
+```python
 class TokenBudget:
 def __init__(self, max_tokens: int):
 self.max_tokens = max_tokens
@@ -51,6 +52,7 @@ output_tokens=response.usage.completion_tokens,
 )
 # BudgetExceeded fires automatically if limit is hit
 
+```
 
 The key insight: token budgets should be per-task, not global. A research task might need 100K tokens. A formatting task needs 5K. A single global budget masks the expensive outliers. Set budgets by task type, and you'll spot waste immediately.
 
@@ -63,6 +65,7 @@ Not every agent step needs your most expensive model. Most workflows are 60-70% 
 The fix is a router that classifies each step and picks the cheapest model that can handle it reliably:
 
 
+```python
 import openai
 
 MODEL_TIERS = {
@@ -94,6 +97,7 @@ model = route_model("extract email addresses from this text")
 model = route_model("debug this race condition", requires_reasoning=True)
 # Returns: o3-mini (complex tier — reasoning needed)
 
+```
 
 The savings are dramatic. If 60% of your agent's steps are flash-tier tasks, you cut those costs by 17x. On a $1,000/month agent bill, that's roughly $500 saved by changing a few lines of routing logic.
 
@@ -110,6 +114,7 @@ Sliding window — keep only the last N messages. Simple and effective for tasks
 Summary compression — every K turns, compress the conversation into a summary. This is the sweet spot for most agent workloads:
 
 
+```python
 def compress_history(
 messages: list[dict],
 llm_client,
@@ -147,6 +152,7 @@ return [
 
 
 Relevant-only retrieval — instead of injecting all tool results into context, store them in a scratchpad and retrieve only what's relevant to the current step. This works best for agents with many tool calls.
+```
 
 The numbers: a 20-turn conversation with full history carries ~50K tokens of context. After summary compression, that drops to ~5K — a 90% reduction in input tokens. At GPT-4o pricing, that saves roughly $0.11 per compression cycle. Across hundreds of daily agent runs, it adds up fast.
 
@@ -157,6 +163,7 @@ The most dangerous cost pattern is the infinite loop. An agent hits an error, re
 Circuit breakers detect runaway behavior and kill the loop before it drains your wallet:
 
 
+```python
 import time
 from dataclasses import dataclass, field
 
@@ -212,6 +219,7 @@ except StepError as e:
 breaker.record_step(cost_usd=cost, success=False)
 # CircuitOpen fires after 3 consecutive failures
 
+```
 
 The three breaker conditions — step count, cost ceiling, and error streaks — catch different failure modes. Step limits catch infinite loops. Cost ceilings catch expensive-but-technically-succeeding runs. Error streaks catch agents that are stuck but keep retrying.
 
@@ -224,6 +232,7 @@ Many agent tool calls return the same result every time. File reads, API lookups
 A simple time-aware cache eliminates the redundant calls:
 
 
+```python
 import hashlib
 import json
 import time
@@ -264,6 +273,7 @@ return database.query(f"SELECT * FROM users WHERE id = '{user_id}'")
 def get_config(key: str) -> str:
 return config_service.get(key)
 
+```
 
 # First call: hits the database. Second call: returns cached result.
 lookup_user("usr_123")  # DB query
@@ -305,7 +315,6 @@ Implement them in order. Model routing and token budgets alone will cut your age
 
 This article is part of the Building Production AI Agents series. Previous: Your AI Agent Is One Prompt Away From Disaster. See also: 5 AI Agent Failures in Production and Single Agent vs Multi-Agent: Why Monoliths Fail.
 
-Building Production AI Agents (26 Part Series)
 The God Agent Anti-Pattern: Why Your AI Breaks at 20 Tools
 Your AI Agent Has Amnesia: Fix It With These 4 Memory Patterns
 ...
@@ -313,12 +322,3 @@ Your AI Agent Has Amnesia: Fix It With These 4 Memory Patterns
 How to Stop AI Agent Cost Spirals Before They Start
 The 5-Layer Security Model Every AI Agent Needs in Production
 Building Custom MCP Servers: A Developer's Guide to Production-Grade AI Agent Tools
-DEV Community
-
-Build Apps with Google AI Studio 🧱
-
-This track will guide you through Google AI Studio's new "Build apps with Gemini" feature, where you can turn a simple text prompt into a fully functional, deployed web application in minutes.
-
-Read more →
-
-Read More

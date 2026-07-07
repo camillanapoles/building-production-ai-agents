@@ -30,6 +30,7 @@ This means every tool needs five components that traditional APIs never bothered
 The tool name is the first thing the model scans when deciding which tool to call. It functions like a class name in a codebase — it sets expectations before any other signal.
 
 
+```python
 # Bad: vague, could mean anything
 @mcp_tool(name="process")
 def process(data):
@@ -50,6 +51,7 @@ def list_overdue_invoices(customer_id: str):
 def invoice_send_reminder(invoice_id: str, channel: str):
 ...
 
+```
 
 Pick one convention — verb_noun or resource_action — and enforce it across every tool on your server. Mixing conventions forces the LLM to learn two mental models, and under load, it will confuse them. We saw a 23% drop in correct tool selection on a production agent when the team had get_user, user_create, and delete_file all coexisting with no pattern.
 
@@ -58,9 +60,11 @@ Pick one convention — verb_noun or resource_action — and enforce it across e
 The tool description is the most underestimated field in tool design. The LLM reads this to decide when to use the tool and what it will get back. It's prompt engineering baked into the tool definition itself.
 
 
+```python
 MISMATCHED_DESCRIPTION = "Searches the database"
 
 GOOD_DESCRIPTION = """\
+```
 Full-text search across the company knowledge base.\
 Use when the user asks to find internal documentation, policies, or technical specs.\
 Returns up to 10 results ranked by relevance, each with title, snippet, and URL.\
@@ -76,6 +80,7 @@ A real measurement from our deployments: improving tool descriptions alone — n
 Models hallucinate parameter values, confuse types, and invent fields that don't exist. Your tool must validate every input before processing. JSON Schema constraints are your first line of defense:
 
 
+```python
 GOOD_INPUT_SCHEMA = {
 "type": "object",
 "properties": {
@@ -103,6 +108,7 @@ GOOD_INPUT_SCHEMA = {
 "additionalProperties": False
 }
 
+```
 
 Enums eliminate entire classes of failures. When environment accepts only "staging" or "production", the LLM can't invent "prod-us-east" and crash your deployment script. We've found that using enums and regex patterns for parameters eliminated 80% of runtime validation errors in production.
 
@@ -116,9 +122,11 @@ Take it a step further with poka-yoke design — making misuse structurally impo
 
 # Use enums with absolute paths for known configs:
 {"config": {
+```python
 "type": "string",
 "enum": ["/etc/prod/config.yaml", "/etc/staging/config.yaml"]
 }}  # good
+```
 
 4. Error Handling: Errors Are Prompts for the LLM
 
@@ -133,6 +141,7 @@ return {"error": "Something went wrong"}
 
 # Good: structured error with actionable context via isError
 return {
+```python
 "isError": True,
 "content": [{
 "type": "text",
@@ -145,6 +154,7 @@ return {
 }]
 }
 
+```
 
 This pattern — machine-readable code, human-readable explanation, retry guidance, and an actionable suggestion — eliminates a large class of agent failures where the model receives a cryptic error and hallucinates a recovery path.
 
@@ -153,6 +163,7 @@ This pattern — machine-readable code, human-readable explanation, retry guidan
 Unpredictable output formats force the LLM to guess, which increases the chance of misinterpretation and downstream errors.
 
 
+```python
 # Bad: inconsistent output shape
 def search(term):
 results = db.query(term)
@@ -178,6 +189,7 @@ for r in results[:limit]
 "hasMore": len(results) > limit
 }
 
+```
 
 The agent always knows what shape to expect. It doesn't need to branch on isinstance(result, str) vs isinstance(result, list). That predictability compounds across multi-step workflows.
 
@@ -196,6 +208,7 @@ Strip internal metadata. The agent doesn't need database IDs, internal timestamp
 
 # Internal DB record (terrible for agent context):
 {
+```python
 "id": "a1b2c3d4-e5f6-7890",
 "_created_at": "2026-04-15T08:23:11.442Z",
 "_updated_at": "2026-04-30T14:07:33.101Z",
@@ -206,15 +219,18 @@ Strip internal metadata. The agent doesn't need database IDs, internal timestamp
 "status": "active",
 "preferences": {"theme": "dark", "notifications": True, ...}
 }
+```
 
 # Agent-friendly output:
 {
+```python
 "name": "John Smith",
 "role": "Product Manager",
 "email": "john@acme.com",
 "status": "active"
 }
 
+```
 
 We measured a 3.2x reduction in per-task token consumption just by stripping internal metadata from tool outputs. At scale, that's the difference between a profitable agent and a cost center.
 
@@ -223,6 +239,7 @@ We measured a 3.2x reduction in per-task token consumption just by stripping int
 The MCP 2025-03-26 spec introduced tool annotations — metadata fields that help agents make smarter decisions about tool invocation:
 
 
+```python
 tool_annotations = {
 "readOnlyHint": True,       # Safe to call without confirmation
 "destructiveHint": False,   # Won't mutate state
@@ -230,17 +247,20 @@ tool_annotations = {
 "openWorldHint": False      # Only reads from known database
 }
 
+```
 
 These annotations drive real behavior in agent clients. A destructiveHint: true tool triggers a confirmation gate before execution. An idempotentHint: true tool lets the client retry safely on timeout. But remember: annotations are hints, not guardrails. The agent client decides whether to honor them.
 
 Anti-Patterns We've Seen in Production
 The God Tool
+```python
 @mcp_tool(name="process_customer_request")
 def process_customer_request(request_text: str):
 # Parses intent, searches DB, sends email, updates CRM, creates ticket...
 # This is 6 operations fused into one. When step 3 fails, the agent
 # cannot retry steps 4-6 independently.
 
+```
 
 Keep tools atomic. One tool, one purpose. If it needs to do X and Y, it should be two tools that the agent composes. Atomic tools are easier to test, easier for the LLM to reason about, and easier to compose into complex workflows.
 
@@ -251,12 +271,14 @@ Your tool description says "returns a list of users." Six months later, after a 
 Treat tool descriptions as living documentation. When you run evals (and you should), include description accuracy checks in your validation pass.
 
 Silent Failure Swallowing
+```python
 def get_metric(name):
 try:
 return metrics_api.get(name)
 except Exception:
 return {"data": []}  # agent thinks everything is fine
 
+```
 
 The agent received what looks like a valid but empty response. It proceeds with wrong assumptions. Always return the failure visibly — isError: true with context — so the agent can reason about recovery.
 
@@ -265,6 +287,7 @@ A Real Production Tool, End to End
 Here's a complete MCP tool definition that follows every principle above, from a production deployment monitoring service:
 
 
+```python
 @server.tool(
 name="deploy_service",
 description=(
@@ -338,6 +361,7 @@ return {
 }]
 }
 
+```
 
 Every principle is represented: precise name, rich description with cross-reference, strict schema with enum and pattern validation, behavioral annotations, structured success output, and structured failure output with actionable suggestions.
 
@@ -362,7 +386,6 @@ The rule of thumb: if the worst-case outcome of the LLM calling this tool wrong 
 
 The TL;DR is simple: treat every tool definition as if it's the product, because for an AI agent, it is. The model reads tool descriptions like source code — every word, every constraint, every example matters. Get this right and your agents become dramatically more reliable without touching a single line of prompt engineering.
 
-Building Production AI Agents (26 Part Series)
 The God Agent Anti-Pattern: Why Your AI Breaks at 20 Tools
 Your AI Agent Has Amnesia: Fix It With These 4 Memory Patterns
 ...
@@ -370,12 +393,3 @@ Your AI Agent Has Amnesia: Fix It With These 4 Memory Patterns
 Building Production-Grade Tools for AI Agents: What Works After 100 Deployments
 The 5-Layer Security Model Every AI Agent Needs in Production
 Building Custom MCP Servers: A Developer's Guide to Production-Grade AI Agent Tools
-DEV Community
-
-Build Apps with Google AI Studio 🧱
-
-This track will guide you through Google AI Studio's new "Build apps with Gemini" feature, where you can turn a simple text prompt into a fully functional, deployed web application in minutes.
-
-Read more →
-
-Read More

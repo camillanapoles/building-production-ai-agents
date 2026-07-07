@@ -29,6 +29,7 @@ Anatomy of a Workflow: Trigger, Chain, Done
 A workflow automation handles a well-defined task with predictable inputs. Every execution follows the same path. Here is a GitHub issue triage workflow that classifies priority and routes to the right Slack channel:
 
 
+```python
 def triage_github_issue(webhook_payload: dict) -> dict:
 \"\"\"Workflow automation: trigger -> fixed chain of actions.\"\"\"
 # Step 1: Extract fields (deterministic)
@@ -54,6 +55,7 @@ message=f\"[{priority}] {title} -- assigned to #{team}\"
 
 return {\"priority\": priority, \"team\": team, \"routed\": True}
 
+```
 
 This runs in milliseconds. It costs nothing beyond the API calls. It is completely predictable -- the same input always produces the same output. You can test it with unit tests and debug it by reading the code.
 
@@ -72,6 +74,7 @@ Anatomy of an Agent: Goal, Reason, Act, Repeat
 An autonomous agent handles the same trigger but reasons about what to do. Instead of following a fixed chain, it investigates:
 
 
+```python
 from openai import OpenAI
 import json
 
@@ -163,6 +166,7 @@ messages.append({
 
 return {\"analysis\": \"Max iterations reached\", \"status\": \"incomplete\"}
 
+```
 
 Given the same \"intermittent 500 errors\" issue, this agent might:
 
@@ -198,6 +202,7 @@ Consider a daily engineering report. Fetching metrics is deterministic -- the sa
 The hybrid pattern uses a workflow for the cheap, predictable parts and an agent for the judgment-heavy part:
 
 
+```python
 from openai import OpenAI
 
 client = OpenAI()
@@ -237,6 +242,7 @@ log_report(content=analysis, timestamp=now())
 
 return {\"status\": \"delivered\", \"analysis_length\": len(analysis)}
 
+```
 
 This pattern keeps your costs low (LLM only runs once, not for every step), your delivery reliable (Slack post never depends on LLM reasoning), and your analysis adaptive (the agent can identify risks you did not anticipate in a rule).
 
@@ -254,7 +260,6 @@ Stop calling everything an agent. If your system follows a fixed chain of steps 
 
 This is part of the Building Production AI Agents series. Previous articles cover cost control patterns, context engineering, and human approval gates for production agents.
 
-Building Production AI Agents (26 Part Series)
 The God Agent Anti-Pattern: Why Your AI Breaks at 20 Tools
 Your AI Agent Has Amnesia: Fix It With These 4 Memory Patterns
 ...
@@ -262,12 +267,3 @@ Your AI Agent Has Amnesia: Fix It With These 4 Memory Patterns
 Workflow Automation vs AI Agents: A Developer's Guide
 The 5-Layer Security Model Every AI Agent Needs in Production
 Building Custom MCP Servers: A Developer's Guide to Production-Grade AI Agent Tools
-DEV Community
-
-Build Apps with Google AI Studio 🧱
-
-This track will guide you through Google AI Studio's new \"Build apps with Gemini\" feature, where you can turn a simple text prompt into a fully functional, deployed web application in minutes.
-
-Read more →
-
-Read More

@@ -13,11 +13,13 @@ The industry term is "token bloat." The fix is deferred tool loading: start with
 This tutorial shows you how. One file, runnable code, no framework dependencies.
 
 The Problem
+```python
 # What most tutorials do:
 agent = Agent(tools=[tool_1, tool_2, tool_3, ..., tool_40])
 # Every LLM call ships ALL 40 tool definitions in the prompt.
 # Cost: ~8,000 tokens per call just for tool schemas.
 
+```
 
 When you're running autonomous agents 24/7, that overhead compounds fast. An agent making 100 calls/day burns an extra 800,000 tokens daily just describing tools it never uses.
 
@@ -41,6 +43,7 @@ Step 1: Build the Tool Registry
 First, a registry that stores all available tools but only exposes a subset at any time.
 
 
+```python
 from dataclasses import dataclass, field
 from typing import Callable, Any
 
@@ -95,6 +98,7 @@ return tool.fn(**arguments)
 def unload_all(self):
 self.active_tools.clear()
 
+```
 
 The registry separates storage (all tools, always available for search) from activation (tools the LLM can actually call). The search function scores matches by name, description, and category — no embeddings needed.
 
@@ -103,6 +107,7 @@ Step 2: Create the Search Tool
 The search tool is the only tool the agent sees on turn one.
 
 
+```python
 def make_search_tool(registry: DeferredToolRegistry) -> Tool:
 return Tool(
 name="search_tools",
@@ -126,10 +131,12 @@ fn=lambda query: registry.search(query),
 category="system",
 )
 
+```
 
 One tool, 200 tokens. It replaces 40 tools at 8,000 tokens.
 
 Step 3: The Agent Loop with Deferred Loading
+```python
 import json
 
 class DeferredAgent:
@@ -169,9 +176,11 @@ messages.append({
 "content": f"Found tools: {[r['name'] for r in results]}. You now have access to these tools. Proceed with your task.",
 "tool_call_id": call.id,
 })
+```
 else:
 # Agent used a loaded tool
 try:
+```python
 args = json.loads(call.function.arguments)
 result = self.registry.execute(call.function.name, args)
 except Exception as e:
@@ -185,6 +194,7 @@ self.registry.load([self.search_tool.name])
 
 return "Max turns reached."
 
+```
 
 The key behavioral pattern:
 
@@ -198,6 +208,7 @@ Step 4: Real-World Tool Registration
 Here's how you'd register actual tools:
 
 
+```python
 registry = DeferredToolRegistry()
 
 registry.register(Tool(
@@ -234,16 +245,19 @@ fn=lambda to, subject, body: "Email sent",
 category="email",
 ))
 
+```
 
 With three tools registered, the search function works like this:
 
 
+```python
 registry.search("database")
 # Returns: [{'name': 'query_database', 'description': '...', 'score': 3}]
 
 registry.search("email newsletter")
 # Returns: [{'name': 'send_email', 'description': '...', 'score': 1}]
 
+```
 
 The agent searches for "database", the system loads query_database, the agent calls it, responds, and the session ends. Total tokens spent on tool definitions: ~400 instead of ~1,200.
 
@@ -256,6 +270,7 @@ Semantic Search (Better Than Keyword Matching)
 Keyword matching misses synonyms. An agent searching for "fetch data" won't find query_database. Use embeddings:
 
 
+```python
 import numpy as np
 
 class SemanticToolSearch:
@@ -280,6 +295,7 @@ similarities = np.dot(self.index, query_embed)
 top_indices = np.argsort(similarities)[::-1][:top_k]
 return [self.tool_names[i] for i in top_indices]
 
+```
 
 Now search("fetch user data") finds query_database even though the word "fetch" isn't in the tool name or description. The embedding model is ~90MB and runs in <10ms on CPU.
 
@@ -288,6 +304,7 @@ Tool Groups and Hierarchical Loading
 Instead of loading individual tools, load groups:
 
 
+```python
 tool_groups = {
 "github": ["get_pull_request", "create_issue", "update_changelog"],
 "database": ["query_database", "list_tables"],
@@ -297,6 +314,7 @@ tool_groups = {
 def load_group(group_name: str):
 self.registry.load(tool_groups[group_name])
 
+```
 
 Add a load_tool_group(group) meta-tool. Agent searches "GitHub stuff" → loads all three GitHub tools at once instead of discovering them one at a time. This saves LLM turns when the task spans multiple related tools.
 
@@ -305,6 +323,7 @@ Budget Enforcement on Tool Loading
 Prevent the agent from loading every tool by searching broadly:
 
 
+```python
 class LoadBudget:
 def __init__(self, max_tools_per_session: int = 5):
 self.max_tools = max_tools_per_session
@@ -316,6 +335,7 @@ return self.loaded_count + count <= self.max_tools
 def record(self, count: int):
 self.loaded_count += count
 
+```
 
 Five tools per session is usually enough. If the agent hits the limit, it must work with what it has — no more loading.
 
@@ -359,7 +379,6 @@ Unload after each session. Don't let tools accumulate across requests. Start fre
 
 The trend is clear: with 177,000+ public tools in the MCP ecosystem, the engineering challenge isn't connecting tools anymore. It's choosing which ones to show the agent at any given moment. Shrink first, plan second — and your agent will perform better while costing less.
 
-Building Production AI Agents (26 Part Series)
 The God Agent Anti-Pattern: Why Your AI Breaks at 20 Tools
 Your AI Agent Has Amnesia: Fix It With These 4 Memory Patterns
 ...
@@ -367,12 +386,3 @@ Your AI Agent Has Amnesia: Fix It With These 4 Memory Patterns
 How to Build Deferred Tool Loading for AI Agents in 15 Minutes
 The 5-Layer Security Model Every AI Agent Needs in Production
 Building Custom MCP Servers: A Developer's Guide to Production-Grade AI Agent Tools
-DEV Community
-
-Build Apps with Google AI Studio 🧱
-
-This track will guide you through Google AI Studio's new "Build apps with Gemini" feature, where you can turn a simple text prompt into a fully functional, deployed web application in minutes.
-
-Read more →
-
-Read More

@@ -22,9 +22,11 @@ MCP standardizes this at the protocol level. Every MCP server speaks JSON-RPC 2.
 
 The three primitives cover every integration pattern:
 
+```python
 Tools — executable functions the agent invokes (API calls, database queries, file writes)
 Resources — read-only context the agent consumes (configs, logs, documentation)
 Prompts — reusable workflow templates that structure interactions
+```
 
 The distinction between tools and resources matters more than most guides acknowledge. Tools change state — they're your agent's verbs. Resources provide context — they're your agent's nouns. When an agent conflates the two, you get agents that try to "read" a database by calling write functions, or worse, agents that mutate state thinking they're just gathering information.
 
@@ -45,6 +47,7 @@ The Python SDK's FastMCP pattern is the fastest path from zero to working server
 Here's a server template that handles real-world requirements:
 
 
+```python
 import os
 from mcp.server.fastmcp import FastMCP
 from pydantic import ValidationError
@@ -69,10 +72,12 @@ city: City name (e.g., 'London', 'Tokyo')
 days: Number of forecast days (1-7)
 units: 'metric' for Celsius, 'imperial' for Fahrenheit
 
+```
 Returns:
 Forecast dict with daily high/low and conditions
 """
 if days < 1 or days > 7:
+```python
 raise ValueError(f"Days must be 1-7, got {days}")
 if units not in ("metric", "imperial"):
 raise ValueError(f"Units must be 'metric' or 'imperial', got {units}")
@@ -112,6 +117,7 @@ return json.dumps(response.json())
 if __name__ == "__main__":
 mcp.run(transport="streamable-http", host="0.0.0.0", port=8000)
 
+```
 
 Run it with uv run weather_server.py and any MCP client can connect. The server exposes get_forecast as a tool and weather://current/{city} as a dynamic resource.
 
@@ -136,6 +142,7 @@ Every tool description should answer three questions:
 When should the agent call this tool?
 What data does it need as input?
 What structure will it get back?
+```python
 # BAD: No trigger condition, no output description
 @mcp.tool()
 def search_db(query: str) -> list:
@@ -145,6 +152,7 @@ def search_db(query: str) -> list:
 # GOOD: Clear trigger, input guidance, output contract
 @mcp.tool()
 def search_db(query: str, limit: int = 20) -> list:
+```
 """Search user records in the PostgreSQL database.
 Call this when the user asks about specific users, accounts, or transactions.
 Returns a list of matching records with id, name, email, and created_at fields.
@@ -161,6 +169,7 @@ Consider a deployment pipeline where the agent needs to: check the current state
 The solution is a composite tool that encapsulates the workflow:
 
 
+```python
 @mcp.tool()
 def deploy_application(
 project: str,
@@ -169,6 +178,7 @@ environment: str = "production",
 dry_run: bool = False
 ) -> dict:
 """Deploy an application to the target environment.
+```
 
 This tool handles the full deployment pipeline:
 1. Validates the target branch exists and is up-to-date
@@ -181,6 +191,7 @@ Use search_build_status first if you need to check the current state.
 """
 # Step 1: Validate
 if environment not in ("staging", "production"):
+```python
 raise ValueError(f"Environment must be 'staging' or 'production'")
 
 # Step 2: Build
@@ -204,6 +215,7 @@ return {
 "health_checks": health,
 }
 
+```
 
 The agent calls one tool. The server orchestrates four steps. The agent gets a single structured result. This pattern reduces token usage, prevents partial-state errors, and makes the agent's behavior predictable.
 
@@ -223,6 +235,7 @@ All subsequent requests include Authorization: Bearer <token>
 Implementing this correctly means:
 
 
+```python
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 import jwt
@@ -253,6 +266,7 @@ return JSONResponse(status_code=401, content={"error": "invalid_token"})
 # Process the MCP JSON-RPC request with authenticated session
 return await process_mcp_request(request, payload)
 
+```
 
 The key insight: token validation happens at the transport layer, not inside individual tools. Every tool call arrives already authenticated. Your tool code can assume the identity of the caller is known.
 
@@ -264,16 +278,19 @@ For small teams and single-tenant deployments, a single MCP server process works
 
 # Deploy behind a reverse proxy
 uv run weather_server.py --port 8000
+```python
 # nginx handles TLS, rate limiting, and access logging
 # Systemd keeps the process alive
 
 Multi-Server Orchestration
+```
 
 Production systems with multiple MCP servers need orchestration. This is where platforms like Nebula come in — you can spin up a unified agent workspace that connects to multiple MCP servers, manages their lifecycle, and provides a single interface for the agent to discover and call tools across all of them.
 
 The architecture looks like:
 
 
+```python
 Agent Host (Nebula)
 ├── MCP Client → GitHub Server (PR management)
 ├── MCP Client → Database Server (read-only queries)
@@ -293,10 +310,12 @@ active_sessions: dict[str, SessionState] = {}
 
 @mcp.tool()
 def list_active_sessions() -> list:
+```
 """List all currently active agent sessions.
 Call this when you need to audit which agents are connected.
 Returns session IDs, connected duration, and last activity timestamp.
 """
+```python
 return [
 {
 "session_id": sid,
@@ -306,6 +325,7 @@ return [
 for sid, s in active_sessions.items()
 ]
 
+```
 
 For high-traffic deployments, put your Streamable HTTP servers behind a load balancer with sticky sessions. MCP sessions maintain state — a given agent should always connect to the same server instance unless you're storing session state in Redis.
 
@@ -322,14 +342,17 @@ Every tool should return structured errors, not raw exceptions:
 
 
 python
+```python
 @mcp.tool()
 def query_database(sql: str) -> dict:
 """Execute a read-only SQL query against the analytics database.
+```
 Only SELECT statements are allowed. INSERT, UPDATE, DELETE will be rejected.
 Returns a dict with 'columns' and 'rows' keys.
 """
 if not sql.strip().upper().startswith("SELECT"):
 return {
+```python
 "status": "error",
 "message": "Only SELECT queries are allowed",
 "query": sql,
@@ -339,7 +362,6 @@ try:
 results = execute_query(sql)
 return {"status": "ok", "columns
 
-Building Production AI Agents (26 Part Series)
 The God Agent Anti-Pattern: Why Your AI Breaks at 20 Tools
 Your AI Agent Has Amnesia: Fix It With These 4 Memory Patterns
 ...
@@ -347,12 +369,4 @@ Your AI Agent Has Amnesia: Fix It With These 4 Memory Patterns
 Building Production-Grade AI Agents with MCP: A Complete Guide for 2026
 The 5-Layer Security Model Every AI Agent Needs in Production
 Building Custom MCP Servers: A Developer's Guide to Production-Grade AI Agent Tools
-DEV Community
-
-Build Apps with Google AI Studio 🧱
-
-This track will guide you through Google AI Studio's new "Build apps with Gemini" feature, where you can turn a simple text prompt into a fully functional, deployed web application in minutes.
-
-Read more →
-
-Read More
+```

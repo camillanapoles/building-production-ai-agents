@@ -30,6 +30,7 @@ The Code
 Create weather_server.py:
 
 
+```python
 from fastmcp import FastMCP
 
 # Initialize the server
@@ -72,6 +73,7 @@ return f"{amount} {from_currency.upper()} = {result:.2f} {to_currency.upper()}"
 if __name__ == "__main__":
 mcp.run()
 
+```
 
 Run it:
 
@@ -88,6 +90,7 @@ Add this to your Claude Desktop config (claude_desktop_config.json):
 
 
 {
+```python
 "mcpServers": {
 "weather-tools": {
 "command": "python",
@@ -100,11 +103,13 @@ Add this to your Claude Desktop config (claude_desktop_config.json):
 Restart Claude Desktop. When you ask "What's the weather in Tokyo?" or "Convert 100 USD to EUR," Claude will see the tools and call them directly.
 
 Cursor / VS Code Copilot
+```
 
 Add to your .mcp.json or MCP settings:
 
 
 {
+```python
 "mcpServers": {
 "weather-tools": {
 "command": "python",
@@ -133,6 +138,7 @@ asyncio.run(main())
 
 What Just Happened
 @mcp.tool() decorator registers each function as an MCP tool. FastMCP auto-generates the JSON Schema from Python type hints — no manual tool definitions needed.
+```
 Docstrings become tool descriptions. The AI reads these to decide when to call each tool. Write clear, specific descriptions — they're your tool's API docs.
 Type hints become validation. If a client passes a string where a float is expected, MCP returns a structured error before your code even runs.
 Stdio transport means Claude/Cursor/VS Code spawn your script as a subprocess. No network ports, no auth — it's the simplest and most secure transport for local dev.
@@ -141,6 +147,7 @@ Next Steps
 Replace the mock data with real API calls:
 
 
+```python
 import httpx
 
 @mcp.tool()
@@ -153,6 +160,7 @@ params={"q": city, "appid": "YOUR_API_KEY", "units": "metric"}
 data = resp.json()
 return f"{city.title()}: {data['main']['temp']}\u00b0C, {data['weather'][0]['description']}"
 
+```
 
 You can also add tools that write files, query databases, call internal APIs, or trigger CI/CD pipelines. The pattern is the same: decorate a function, write a clear docstring, and your AI agent gains a new capability.
 

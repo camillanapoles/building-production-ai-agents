@@ -18,6 +18,7 @@ Structured Outputs
 You tell the model: "Respond in this exact format." You supply a schema (Pydantic, JSON Schema, or a system prompt describing fields), and the LLM produces a single response that matches.
 
 
+```python
 from openai import OpenAI
 from pydantic import BaseModel
 
@@ -37,6 +38,7 @@ response_format=WeatherResponse,
 result: WeatherResponse = response.choices[0].message.parsed
 print(result.temperature_c)
 
+```
 
 The model returns one JSON object that satisfies the schema. No intermediate steps, no decisions.
 
@@ -45,6 +47,7 @@ Tool Calling (Function Calling)
 You register callable functions with the model. The model decides which tool to call, with what arguments, and returns a tool call request instead of a text answer.
 
 
+```python
 from openai import OpenAI
 
 client = OpenAI()
@@ -72,6 +75,7 @@ tool_call = response.choices[0].message.tool_calls[0]
 print(tool_call.function.arguments)
 # '{"city": "Tokyo", "units": "metric"}'
 
+```
 
 The model returns a decision to call a function. You execute it, feed results back, and the model produces a final answer.
 
@@ -89,6 +93,7 @@ When to Use Structured Output
 Your input is a blob of text. Your output is a structured extraction. No intermediate actions needed.
 
 
+```python
 class IssueExtraction(BaseModel):
 severity: str  # LOW, MEDIUM, HIGH, CRITICAL
 affected_service: str
@@ -105,6 +110,7 @@ messages=[
 response_format=IssueExtraction,
 )
 
+```
 
 The model reads the report and produces a structured IssueExtraction. One API call. No function execution. Use this when the transformation is read-only — the model analyzes and extracts, it doesn't act.
 
@@ -117,10 +123,12 @@ OpenAI's response_format with structured outputs does schema enforcement at the 
 Anthropic's tool_use blocks offer similar enforcement, Anthropic's beta.tools with response models enforce schema. But for pure extraction, structured output APIs have tighter integration.
 
 
+```python
 # This always returns a valid IssueExtraction or raises an API error
 # You don't need try/except around json.loads()
 extraction = response.choices[0].message.parsed
 assert isinstance(extraction, IssueExtraction)  # Always true
+```
 
 3. Parallel Extraction Across Multiple Inputs
 
@@ -139,16 +147,19 @@ The user asks: "Find the most expensive error in Sentry this week, check what de
 
 A structured output can't do this. The model needs to:
 
+```python
 Query Sentry (tool call)
 Read the result (context in next message)
 Query deployment logs (tool call)
 Cross-reference the data
 Create a GitHub issue (tool call)
 Summarize the finding (final text response)
+```
 
 This is the agent loop: decide → call → observe → decide again.
 
 
+```python
 tools = [
 {"type": "function", "function": {
 "name": "query_sentry",
@@ -198,6 +209,7 @@ else:
 print(response.choices[0].message.content)
 break
 
+```
 
 The model orchestrates three different systems. Structured outputs can express the final result but can't get you there.
 
@@ -221,12 +233,14 @@ Modern models support calling multiple tools in a single response. If the model 
 
 # Model returns:
 {
+```python
 "tool_calls": [
 {"function": {"name": "get_weather", "arguments": '{"city": "Tokyo"}'}, "id": "call_1"},
 {"function": {"name": "get_weather", "arguments": '{"city": "London"}'}, "id": "call_2"},
 {"function": {"name": "get_weather", "arguments": '{"city": "NYC"}'}, "id": "call_3"},
 ]
 }
+```
 
 # You execute all three in parallel, then feed results back
 
@@ -240,6 +254,7 @@ If you're building an MCP server, tool calling is the protocol. MCP is, at its c
 When your agent connects to an MCP server, it's using tool calling under the hood. The MCP server advertises its capabilities, the agent picks which tools to invoke, and sends JSON-RPC requests.
 
 
+```python
 # MCP client side — this is structured tool calling over a transport
 from mcp import ClientSession
 
@@ -247,6 +262,7 @@ async with client_session(server) as session:
 tools = await session.list_tools()  # Discover available tools
 result = await session.call_tool("get_weather", {"city": "Tokyo"})
 
+```
 
 If your agent needs to connect to external systems via MCP, tool calling isn't optional — it's the interface.
 
@@ -266,6 +282,7 @@ Most real agent workflows use both. The pattern looks like this:
 
 Tool calling for the orchestration layer — the model decides which systems to query and in what order.
 Structured output for the final result — the parsed, validated data you persist or act on.
+```python
 # Layer 1: Tool calling to gather data
 tools = [query_database, search_docs, check_status]
 # ... agent loop ...
@@ -280,6 +297,7 @@ response_format=IncidentReport,
 # analysis is a validated IncidentReport object, not raw text
 save_to_database(analysis.model_dump())
 
+```
 
 This gives you flexible orchestration (the model picks the right tools in the right order) and reliable output (the final response is schema-validated, ready for downstream processing).
 
@@ -298,6 +316,7 @@ Every tool-calling loop must have a hard cap. Models can enter reflection loops 
 
 
 for iteration in range(5):  # ALWAYS enforce a max
+```python
 response = call_model(messages, tools)
 if not response.tool_calls:
 break
@@ -306,16 +325,19 @@ else:
 messages.append({"role": "system", "content": "Max iterations reached. Summarize what you found so far."})
 
 No Fallback on Tool Failure
+```
 
 When a tool call raises an exception, feed the error back to the model as a tool response. The model can retry, pick a different tool, or gracefully degrade:
 
 
 messages.append({
+```python
 "role": "tool",
 "content": f"Error: Database connection timeout. Retry or try a different query.",
 "tool_call_id": call_id,
 })
 
+```
 
 Silent tool failures mean the agent loop stalls. Explicit error messages mean the agent adapts.
 
@@ -339,6 +361,7 @@ User Message
 │  - Structured parsing    │
 └─────────────────────────┘
 │
+```python
 ├──→ Tool: database query (MCP)
 ├──→ Tool: web search (MCP)
 ├──→ Tool: GitHub API (MCP)
@@ -351,6 +374,7 @@ User Message
 │  - Deliver to user        │
 └─────────────────────────┘
 
+```
 
 If you're building a single agent with a handful of tools, the raw chat.completions API works fine. If your agents span multiple MCP servers, need tool budget enforcement, or require structured output validation at scale, a platform that handles the orchestration loop is worth the overhead.
 
@@ -370,7 +394,6 @@ The choice between structured outputs and tool calling isn't just an API prefere
 
 This article is part of the Building Production AI Agents series on Dev.to, covering the real engineering challenges of running autonomous AI agents — from MCP server architecture to agent guardrails.
 
-Building Production AI Agents (26 Part Series)
 The God Agent Anti-Pattern: Why Your AI Breaks at 20 Tools
 Your AI Agent Has Amnesia: Fix It With These 4 Memory Patterns
 ...
@@ -378,12 +401,3 @@ Your AI Agent Has Amnesia: Fix It With These 4 Memory Patterns
 Structured Outputs vs Tool Calling: When Your Agent Actually Needs Which
 The 5-Layer Security Model Every AI Agent Needs in Production
 Building Custom MCP Servers: A Developer's Guide to Production-Grade AI Agent Tools
-DEV Community
-
-Work through these 3 parts to earn the exclusive Google AI Studio Builder badge!
-
-This track will guide you through Google AI Studio's new "Build apps with Gemini" feature, where you can turn a simple text prompt into a fully functional, deployed web application in minutes.
-
-Read more →
-
-Read More

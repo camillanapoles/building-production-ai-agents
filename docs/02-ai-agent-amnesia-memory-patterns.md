@@ -31,6 +31,7 @@ Pattern 1: Conversation Buffer (Short-Term Memory)
 The simplest pattern. Store the last N messages in a list and pass them to the LLM as context.
 
 
+```python
 class ConversationBuffer:
 def __init__(self, max_tokens=4000):
 self.messages = []
@@ -50,6 +51,7 @@ return sum(len(m["content"]) // 4 for m in self.messages)
 def get_context(self) -> list:
 return self.messages
 
+```
 
 This is a ring buffer with token-aware truncation. When the buffer exceeds your token budget, it drops the oldest messages first.
 
@@ -64,6 +66,7 @@ Pattern 2: Summary Memory (Compressed Long-Term)
 When conversations get long, you can't keep every message. Summary memory uses the LLM itself to compress older turns into a running summary, keeping recent messages verbatim.
 
 
+```python
 def compress_memory(messages, summary_so_far, model="gpt-4o-mini"):
 old_messages = messages[:-5]  # Keep last 5 verbatim
 recent = messages[-5:]
@@ -71,7 +74,9 @@ recent = messages[-5:]
 new_summary = llm_call(
 model=model,
 prompt=f"""Previous summary: {summary_so_far}
+```
 New messages to incorporate: {format_messages(old_messages)}
+```python
 Write an updated summary capturing all key facts,
 decisions, and context. Be specific -- names, numbers,
 and decisions matter more than pleasantries."""
@@ -80,6 +85,7 @@ return new_summary, recent
 
 
 Every N turns (or when you hit a token threshold), summarize the oldest messages and keep only the compressed version plus recent context.
+```
 
 Use it when: Your agent handles long support conversations, extended debugging sessions, or any interaction that regularly exceeds the context window.
 
@@ -92,6 +98,7 @@ Pattern 3: Retrieval Memory (Semantic Search)
 Store every past interaction in a vector database. Before each agent run, embed the current task and retrieve the most relevant past experiences using semantic search.
 
 
+```python
 import chromadb
 from uuid import uuid4
 
@@ -116,6 +123,7 @@ n_results=top_k
 )
 return results["documents"][0]
 
+```
 
 This is the only memory pattern that scales to thousands of past interactions without blowing up your context window. Instead of stuffing everything into the prompt, you search for what's relevant.
 
@@ -130,6 +138,7 @@ Pattern 4: Structured State (Key-Value Memory)
 This is the most underrated pattern -- and the one that matters most in production. Instead of storing raw conversations, explicitly store the facts your agent has learned.
 
 
+```python
 import json
 from datetime import datetime
 from pathlib import Path
@@ -162,6 +171,7 @@ return {}
 def _save(self):
 self.db_path.write_text(json.dumps(self.state, indent=2))
 
+```
 
 This stores explicit, queryable facts: user preferences, routing rules, entity mappings, operational checkpoints.
 
@@ -212,19 +222,9 @@ Don't let your agent start every day from scratch. The patterns are simple. The 
 
 What's the weirdest thing your agent forgot that caused a production incident? Drop it in the comments -- I'll share mine.
 
-Building Production AI Agents (26 Part Series)
 The God Agent Anti-Pattern: Why Your AI Breaks at 20 Tools
 Your AI Agent Has Amnesia: Fix It With These 4 Memory Patterns
 ...
 22 more parts...
 The 5-Layer Security Model Every AI Agent Needs in Production
 Building Custom MCP Servers: A Developer's Guide to Production-Grade AI Agent Tools
-DEV Community
-
-Work through these 3 parts to earn the exclusive Google AI Studio Builder badge!
-
-This track will guide you through Google AI Studio's new "Build apps with Gemini" feature, where you can turn a simple text prompt into a fully functional, deployed web application in minutes.
-
-Read more →
-
-Read More

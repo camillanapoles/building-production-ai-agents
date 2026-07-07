@@ -32,13 +32,16 @@ The simplest event-driven pattern: events go into a queue, worker agents pull an
 
 When to Use It
 Single-purpose agents that process one type of event
+```python
 Workloads where ordering matters (FIFO processing)
 Systems where you need guaranteed delivery (no dropped events)
 Implementation
+```
 
 Here is a minimal but production-ready implementation using Redis Streams (you could swap in RabbitMQ, SQS, or any message broker):
 
 
+```python
 import asyncio
 import json
 import redis.asyncio as redis
@@ -134,6 +137,7 @@ print(f"Error processing {event_id}: {e}")
 if __name__ == "__main__":
 asyncio.run(worker_loop())
 
+```
 
 This gives you several production features out of the box:
 
@@ -155,6 +159,7 @@ Implementation
 Redis Pub/Sub is the simplest fan-out mechanism. For durability, you would use multiple consumer groups on the same Redis Stream (each group gets every message independently).
 
 
+```python
 import asyncio
 import json
 import redis.asyncio as redis
@@ -218,6 +223,7 @@ agent_worker("sales-notifier", sales_handler),
 if __name__ == "__main__":
 asyncio.run(main())
 
+```
 
 The key insight: each consumer group maintains its own read cursor. Publishing one customer.signup event means all four agents process it independently. If the email agent is slow, it does not block the provisioning agent. If the CRM agent crashes, it resumes from its last acknowledged event without affecting the others.
 
@@ -228,6 +234,7 @@ Fan-out is powerful but introduces a coordination challenge: what happens when m
 The cleanest solution is the completion event pattern: each agent emits a completion event when done. A coordinator agent subscribes to all completion events and triggers the final action when all prerequisites are met.
 
 
+```python
 # Each agent emits when done:
 await publish_event("provision.completed", {"user_id": uid})
 await publish_event("crm.updated", {"user_id": uid})
@@ -240,12 +247,14 @@ if status.get("provisioned") and status.get("crm_updated"):
 await publish_event("onboarding.complete", {"user_id": user_id})
 
 Pattern 3: Event Sourcing for Auditable Agent Decisions
+```
 
 In regulated industries or high-stakes applications, you need to know exactly what your agent did and why. Event sourcing records every state change as an immutable event, creating a complete audit trail that you can replay to reconstruct any past state.
 
 This matters for AI agents because LLM outputs are stochastic. The same input can produce different outputs. When a customer asks "why did your agent reject my application?", you need to show the exact inputs, the exact model output, and the exact decision logic -- not a best guess.
 
 Implementation
+```python
 import json
 import hashlib
 from dataclasses import dataclass, asdict
@@ -337,6 +346,7 @@ chain = store.get_causal_chain("evt_003")
 for event in chain:
 print(f"{event.event_type}: {event.payload}")
 
+```
 
 The parent_event_id field creates a causal chain. Every agent decision links back to the event that triggered it. When auditors ask "how did the agent decide to approve this loan?", you walk the chain: application received -> credit analyzed (with exact model, prompt, and output) -> decision made.
 
@@ -351,6 +361,7 @@ Real-world agent workflows span multiple steps, multiple services, and sometimes
 Consider an e-commerce fulfillment agent: it needs to charge the card, reserve inventory, schedule shipping, and send confirmation. If shipping fails, you need to release the inventory and refund the card. Without saga orchestration, partial failures leave your system in an inconsistent state.
 
 Implementation
+```python
 import asyncio
 from dataclasses import dataclass, field
 from enum import Enum
@@ -452,6 +463,7 @@ print(f"Result: {'Success' if success else 'Rolled back'}")
 if __name__ == "__main__":
 asyncio.run(main())
 
+```
 
 Output when shipping fails:
 
@@ -479,6 +491,7 @@ Retry with Exponential Backoff
 Transient failures are common -- network blips, rate limits, cold starts. Retrying with exponential backoff handles them gracefully:
 
 
+```python
 import asyncio
 import random
 
@@ -494,6 +507,7 @@ delay = base_delay * (2 ** attempt) + random.uniform(0, 0.5)
 print(f"Retry {attempt + 1}/{max_retries} in {delay:.1f}s: {e}")
 await asyncio.sleep(delay)
 
+```
 
 The jitter (random addition) prevents thundering herd problems when multiple agents retry simultaneously against the same service.
 
@@ -502,6 +516,7 @@ Dead Letter Queues
 When retries are exhausted, events go to a dead letter queue (DLQ) instead of being dropped silently. This gives you a safety net for manual investigation:
 
 
+```python
 DLQ_STREAM = "agent:dead-letters"
 
 async def send_to_dlq(event_id: str, event: dict, error: str):
@@ -517,6 +532,7 @@ await rdb.xadd(DLQ_STREAM, {
 # Acknowledge the original event so it stops being redelivered
 await rdb.xack(STREAM, GROUP, event_id)
 
+```
 
 Check your DLQ daily. Patterns in dead-lettered events reveal systemic issues: if the same event type keeps failing, you have a bug, not a transient error.
 
@@ -525,6 +541,7 @@ Structured Logging for Agent Observability
 Event-driven systems are harder to debug than request-response systems because there is no single request thread to follow. Structured logging with correlation IDs solves this:
 
 
+```python
 import structlog
 
 log = structlog.get_logger()
@@ -544,6 +561,7 @@ except Exception as e:
 logger.error("event.failed", error=str(e))
 raise
 
+```
 
 The correlation_id follows an event through the entire fan-out chain. When four agents process the same customer signup, you can filter logs by correlation ID to see the complete picture.
 
@@ -574,7 +592,6 @@ The best agents are not the ones with the smartest prompts. They are the ones th
 
 This is Part 5 of the Building Production AI Agents series. Previous: Event-Driven AI Agent Architecture Patterns.
 
-Building Production AI Agents (26 Part Series)
 The God Agent Anti-Pattern: Why Your AI Breaks at 20 Tools
 Your AI Agent Has Amnesia: Fix It With These 4 Memory Patterns
 ...
@@ -582,12 +599,3 @@ Your AI Agent Has Amnesia: Fix It With These 4 Memory Patterns
 Event-Driven AI Agents: Patterns That Scale
 The 5-Layer Security Model Every AI Agent Needs in Production
 Building Custom MCP Servers: A Developer's Guide to Production-Grade AI Agent Tools
-DEV Community
-
-Work through these 3 parts to earn the exclusive Google AI Studio Builder badge!
-
-This track will guide you through Google AI Studio's new "Build apps with Gemini" feature, where you can turn a simple text prompt into a fully functional, deployed web application in minutes.
-
-Read more →
-
-Read More

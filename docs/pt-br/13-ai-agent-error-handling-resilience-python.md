@@ -1,4 +1,4 @@
-# AI Agent Error Handling: 4 Resilience Patterns in Python
+# Tratamento de erros do agente AI: 4 padrões de resiliência em Python
 
 > Artigo #13 da série **Building Production AI Agents** por *The Daily Agent*
 >
@@ -6,35 +6,35 @@
 
 ---
 
-Your AI agent works flawlessly in development. Then it hits production, OpenAI returns a 429, your fallback prompt throws a validation error, and the entire pipeline crashes at 2 AM with nobody watching.
+Seu agente de IA funciona perfeitamente no desenvolvimento. Em seguida, ele atinge a produção, o OpenAI retorna um 429, seu prompt fallback gera um erro de validação e todo o pipeline trava às 2 da manhã sem ninguém observando.
 
-This is not a testing problem. It is an AI agent error handling problem. LLM APIs fail in ways traditional software never does -- rate limits, non-deterministic outputs, content policy rejections, and context window overflows are not edge cases. They are daily operational realities at any meaningful scale.
+Este não é um problema de teste. É um problema de tratamento de erros do agente de IA. As APIs LLM falham de uma forma que o software tradicional nunca falha: limites de taxa, resultados não determinísticos, rejeições de política de conteúdo e estouros de janela de contexto não são casos extremos. São realidades operacionais diárias em qualquer escala significativa.
 
-This guide covers four battle-tested resilience patterns -- retry with backoff, model fallback chains, circuit breakers, and graceful degradation -- with pure Python implementations you can drop into any project. No framework lock-in, no heavy dependencies.
+Este guia cobre quatro padrões de resiliência testados em batalha - nova tentativa com espera, cadeias de fallback modelo, disjuntors e degradação graciosa - com implementações Python puras que você pode inserir em qualquer projeto. Sem dependência de estrutura, sem dependências pesadas.
 
-Why AI Agents Fail Differently Than Traditional Software
+Por que os agentes de IA falham de maneira diferente dos softwares tradicionais
 
-Traditional APIs fail predictably. A database is down, you get a connection error. An auth token expires, you get a 401. You can write deterministic tests for these.
+APIs tradicionais falham de forma previsível. Um banco de dados está inativo, você recebe um erro de conexão. Um token de autenticação expira, você recebe um 401. Você pode escrever testes determinísticos para eles.
 
-LLM-powered agents introduce a fundamentally different failure model:
+agentes alimentados por LLM introduzem um modelo de falha fundamentalmente diferente:
 
-Rate limits (429) hit unpredictably based on tokens-per-minute quotas that fluctuate with provider load
-Context window overflow happens silently as your agent accumulates tool results and conversation history
-Content policy rejections vary between providers and trigger on inputs you never anticipated
-Response format drift occurs when providers update models -- your perfectly structured JSON prompt returns subtly different output
-Partial or malformed responses break downstream parsing without throwing obvious errors
+Os limites de taxa (429) atingem imprevisivelmente com base em cotas de tokens por minuto que flutuam com a carga do provedor
+O estouro da janela de contexto ocorre silenciosamente à medida que seu agente acumula resultados de ferramentas e histórico de conversas
+As rejeições da política de conteúdo variam entre os provedores e são desencadeadas por informações que você nunca imaginou
+O desvio no formato de resposta ocorre quando os provedores atualizam os modelos – seu prompt JSON perfeitamente estruturado retorna uma saída sutilmente diferente
+Respostas parciais ou malformadas interrompem a análise posterior sem gerar erros óbvios
 
-The critical insight: these failures are not bugs to eliminate. They are operational realities to engineer around. Every production AI agent needs a resilience layer between its business logic and the LLM APIs it depends on.
+O insight crítico: essas falhas não são bugs a serem eliminados. São realidades operacionais para serem projetadas. Todo agente de IA de produção precisa de uma camada de resiliência entre sua lógica de negócios e as APIs LLM das quais depende.
 
-Here are the four patterns that provide that layer.
+Aqui estão os quatro padrões que fornecem essa camada.
 
-Pattern 1: Smart Retry with Exponential Backoff
+Padrão 1: Nova tentativa inteligente com espera exponencial
 
-Retries are your first line of defense against transient failures. But naive retries on LLM APIs are dangerous -- they amplify failures, waste tokens, and can drain your budget during an outage.
+As novas tentativas são sua primeira linha de defesa contra falhas transitórias. Mas novas tentativas ingênuas em APIs LLM são perigosas – elas amplificam falhas, desperdiçam tokens e podem esgotar seu orçamento durante uma interrupção.
 
-The key principle: not all errors deserve a retry. Retrying a permanent failure (bad API key, malformed request) wastes time and money. Failing fast on a transient error (rate limit, timeout) loses a request that would have succeeded on the second try.
+O princípio fundamental: nem todos os erros merecem uma nova tentativa. Tentar novamente uma falha permanente (chave de API incorreta, solicitação malformada) desperdiça tempo e dinheiro. Falha rápida em um erro transitório (limite de taxa, timeout) perde uma solicitação que teria sido bem-sucedida na segunda tentativa.
 
-Start by classifying errors:
+Comece classificando os erros:
 
 
 ```python
@@ -51,19 +51,19 @@ error_str = str(error).lower()
 status = getattr(error, 'status_code', None)
 ```
 
-# Transient: retry with backoff
-if status in (429, 500, 502, 503) or 'timeout' in error_str:
-return ErrorType.TRANSIENT
+# Transitório: tentar novamente com espera
+se o status estiver em (429, 500, 502, 503) ou 'timeout' em error_str:
+retornar ErrorType.TRANSIENT
 
-# Degraded: switch to fallback model
-if 'context_length' in error_str or 'content_filter' in error_str:
-return ErrorType.DEGRADED
+# Degradado: mude para o modelo fallback
+se 'context_length' em error_str ou 'content_filter' em error_str:
+retornar ErrorType.DEGRADED
 
-# Permanent: fail immediately
-return ErrorType.PERMANENT
+# Permanente: falha imediatamente
+retornar ErrorType.PERMANENT
 
 
-Now build the retry logic. The implementation uses exponential backoff with jitter -- the jitter prevents the "thundering herd" problem where multiple agent instances all retry at exactly the same intervals after a shared rate limit:
+Agora crie a lógica retry. A implementação usa espera exponencial com jitter - o jitter evita o problema do "rebanho trovejante", onde múltiplas instâncias de agente retry exatamente nos mesmos intervalos após um limite de taxa compartilhado:
 
 
 ```python
@@ -83,13 +83,13 @@ jitter: float = 1.0,
 """Retry a function with exponential backoff and jitter.
 ```
 
-Only retries on transient errors. Permanent errors fail immediately.
-Degraded errors are re-raised for the fallback layer to handle.
+Apenas tenta novamente em erros transitórios. Erros permanentes falham imediatamente.
+Erros degradados são gerados novamente para serem manipulados pela camada fallback.
 """
-last_exception = None
+last_exception = Nenhum
 
-for attempt in range(max_retries + 1):
-try:
+para tentativa no intervalo (max_retries + 1):
+tentar:
 ```python
 return func()
 except Exception as e:
@@ -123,7 +123,7 @@ raise last_exception
 
 ```
 
-Usage with any LLM provider:
+Uso com qualquer provedor LLM:
 
 
 ```python
@@ -143,15 +143,15 @@ response = retry_with_backoff(call_llm, max_retries=3)
 
 ```
 
-Two details that matter in production:
+Dois detalhes que importam na produção:
 
-Always set a timeout on LLM calls. A request that hangs for 5 minutes during a retry cycle blocks your entire agent pipeline. 30 seconds is a reasonable default.
-Track token spend across retries. Three retries of a 4K-token prompt cost 12K tokens. Add a budget cap if your agent runs autonomously.
-Pattern 2: Model Fallback Chains
+Sempre defina um timeout nas chamadas LLM. Uma solicitação que fica suspensa por 5 minutos durante um ciclo de repetição bloqueia todo o pipeline do agente. 30 segundos é um padrão razoável.
+Acompanhe o gasto de tokens em todas as tentativas. Três novas tentativas de um prompt de token de 4K custam 12K tokens. Adicione um limite de orçamento se o seu agente funcionar de forma autônoma.
+Padrão 2: Modelo de Cadeias de Fallback
 
-Retries handle transient failures within a single provider. But what happens when the provider itself is down, or when a content policy rejection is provider-specific, or when you need a model with a larger context window?
+As novas tentativas tratam de falhas transitórias em um único provedor. Mas o que acontece quando o próprio provedor está inativo, ou quando uma rejeição de política de conteúdo é específica do provedor, ou quando você precisa de um modelo com uma janela de contexto maior?
 
-Fallback chains route requests to alternative models automatically when the primary fails:
+As cadeias de fallback encaminham solicitações para modelos alternativos automaticamente quando o primário falha:
 
 
 ```python
@@ -169,7 +169,7 @@ class FallbackChain:
 
 Each model gets retry_with_backoff protection. If retries exhaust,
 ```
-the chain moves to the next model.
+a cadeia passa para o próximo modelo.
 """
 
 ```python
@@ -209,22 +209,22 @@ raise RuntimeError(f"All {len(self.models)} models failed: {errors}")
 
 def _extract_content(self, result, model_name: str) -> str:
 ```
-"""Normalize response format across providers."""
-# OpenAI format
-if hasattr(result, 'choices'):
-return result.choices[0].message.content
-# Anthropic format
-if hasattr(result, 'content'):
-return result.content[0].text
-# Dict format
-if isinstance(result, dict):
+"""Normalizar o formato de resposta entre provedores."""
+#Formato OpenAI
+if hasattr(resultado, 'escolhas'):
+retornar resultado.escolhas[0].message.content
+# Formato antrópico
+if hasattr(resultado, 'conteúdo'):
+retornar resultado.content[0].text
+# Formato de ditado
+if isinstance(resultado, ditado):
 ```python
 return result.get('content', str(result))
 return str(result)
 
 ```
 
-Set up a practical fallback chain:
+Configure uma cadeia prática de fallback:
 
 
 ```python
@@ -264,17 +264,17 @@ print(f"Answered by: {result['model']}, fallback: {result['fallback_used']}")
 
 ```
 
-The fallback order matters. Organize by: quality first, then different provider, then cost-optimized. If GPT-4o is rate-limited, Claude Sonnet (different provider) will likely succeed. GPT-4o-mini is the last resort -- cheaper, faster, lower quality, but always available.
+A ordem fallback é importante. Organize por: primeiro a qualidade, depois o fornecedor diferente e depois a otimização de custos. Se o GPT-4o tiver taxa limitada, Claude Sonnet (fornecedor diferente) provavelmente terá sucesso. GPT-4o-mini é o último recurso – mais barato, mais rápido, de qualidade inferior, mas sempre disponível.
 
-One design decision worth highlighting: the FallbackChain wraps each model call in retry_with_backoff. This means each model gets its own retry attempts before the chain moves on. Retries handle transient blips; fallbacks handle sustained outages.
+Uma decisão de design que vale a pena destacar: o FallbackChain envolve cada chamada de modelo em retry_with_backoff. Isso significa que cada modelo tem suas próprias tentativas de retry antes que a cadeia prossiga. As novas tentativas tratam de mensagens transitórias; fallbacks lidam com interrupções sustentadas.
 
-Pattern 3: Circuit Breaker for Tool Calls
+Padrão 3: Disjuntor para Chamadas de Ferramentas
 
-Retries and fallbacks handle individual request failures. Circuit breakers solve a different problem: what happens when a provider or tool is down for 10 minutes and every request in your system wastes 30 seconds retrying before failing?
+Novas tentativas e fallbacks tratam de falhas de solicitações individuais. Os disjuntores resolvem um problema diferente: o que acontece quando um provedor ou ferramenta fica inativo por 10 minutos e cada solicitação em seu sistema perde 30 segundos tentando novamenteantes de falhar?
 
-Without a circuit breaker, a flaky external API turns every agent request into a slow failure. Your users wait, your token budget burns, and the struggling provider gets hammered with retry traffic that prevents recovery.
+Sem um disjuntor, uma API externa instável transforma cada solicitação do agente em uma falha slow. Seus usuários esperam, seu orçamento de token queima e o provedor em dificuldades é atingido por um tráfego de novas tentativas que impede a recuperação.
 
-A circuit breaker monitors failure rates and "trips" when they exceed a threshold, immediately rejecting requests instead of attempting them:
+Um disjuntor monitora as taxas de falha e "disparos" quando excedem um limite, rejeitando imediatamente as solicitações em vez de tentar realizá-las:
 
 
 ```python
@@ -370,7 +370,7 @@ pass
 
 ```
 
-The state machine is simple but powerful:
+A máquina de estados é simples, mas poderosa:
 
 
 ```python
@@ -386,7 +386,7 @@ CLOSED             OPEN
 
 ```
 
-Use a separate circuit breaker for each external dependency:
+Use um disjuntor separado para cada dependência externa:
 
 
 ```python
@@ -407,13 +407,13 @@ return []  # Graceful degradation: empty results, not a crash
 
 ```
 
-The critical detail: one breaker per external dependency. If OpenAI is down, you do not want the breaker to block Anthropic calls too. And the success_threshold=2 parameter prevents a single lucky request from restoring full traffic to an unstable service.
+O detalhe crítico: um disjuntor por dependência externa. Se o OpenAI estiver inativo, você não deseja que o disjuntor bloqueie as chamadas Antrópicas também. E o parâmetro success_threshold=2 evita que uma única solicitação bem-sucedida restaure o tráfego total para um serviço instável.
 
-Pattern 4: Graceful Degradation
+Padrão 4: Degradação Graciosa
 
-Sometimes everything fails. Your primary model is rate-limited, the fallback provider is down, and the circuit breaker is open. Traditional error handling crashes. Graceful degradation delivers something useful instead of nothing.
+Às vezes tudo falha. Seu modelo principal tem taxa limitada, o provedor fallback está inativo e o disjuntor está aberto. Travamentos tradicionais no tratamento de erros. A degradação graciosa oferece algo útil em vez de nada.
 
-The principle: users tolerate reduced capability far more than they tolerate crashes or hung requests.
+O princípio: os usuários toleram muito mais capacidade reduzida do que falhas ou solicitações interrompidas.
 
 
 ```python
@@ -473,7 +473,7 @@ warning="All AI services are currently unavailable.",
 
 ```
 
-The quality_tier field is important for downstream logic. Your application can make decisions based on response quality:
+O campo quality_tier é importante para a lógica downstream. Seu aplicativo pode tomar decisões com base na qualidade da resposta:
 
 
 ```python
@@ -492,10 +492,10 @@ send_report(response.content)
 Putting It All Together: A Resilient Agent Pipeline
 ```
 
-The real power comes from composing all four patterns into a layered defense. Here is the execution order from outermost to innermost:
+O verdadeiro poder vem da composição de todos os quatro padrões em uma defesa em camadas. Aqui está a ordem de execução do mais externo para o mais interno:
 
 
-Your Agent Logic
+Sua lógica de agente
 |
 ```python
 Graceful Degradation (always returns something)
@@ -510,7 +510,7 @@ LLM Provider API
 
 ```
 
-Here is a complete, working pipeline that wires everything together:
+Aqui está um pipeline completo e funcional que conecta tudo:
 
 
 ```python
@@ -576,10 +576,10 @@ print(f"Response: {response.content[:200]}")
 
 ```
 
-Notice how the layers compose: retry happens inside the circuit breaker, which happens inside the fallback chain, which happens inside the degradation wrapper. If retries exhaust their attempts, the circuit breaker records a failure. After enough failures, the circuit opens and the fallback chain skips that provider entirely -- no retries, no waiting.
+Observe como as camadas se compõem: retry acontece dentro do disjuntor, que acontece dentro da cadeia fallback, que acontece dentro do wrapper de degradação. Se as novas tentativas esgotarem suas tentativas, o disjuntor registra uma falha. Após falhas suficientes, o circuito abre e a cadeia fallback ignora totalmente esse provedor - sem novas tentativas, sem espera.
 
-Quick Reference: When to Use Each Pattern
-Pattern	Best For	Avoid When
+Referência rápida: quando usar cada padrão
+Padrão melhor para evitar quando
 ```python
 Exponential Backoff	Rate limits, transient 5xx errors	Permanent failures (auth, bad request)
 Model Fallback	Provider outages, cost optimization	Task needs a specific model's capabilities
@@ -588,27 +588,27 @@ Graceful Degradation	Multi-source tasks, user-facing agents	Binary success/fail 
 Key Metrics to Track
 ```
 
-Resilience patterns are only as good as your ability to observe them. Track these in production:
+Os padrões de resiliência são tão bons quanto a sua capacidade de observá-los. Acompanhe-os na produção:
 
-Retry rate per provider -- Spike above 20%? Something is degraded upstream. Set alerts.
-Fallback activation rate -- If your primary model fails more than 10% of the time, reconsider your provider choice.
-Circuit breaker state changes -- Every OPEN/CLOSE transition should trigger an alert. Frequent cycling means an unstable dependency.
-Degradation tier distribution -- What percentage of responses are served from cache or static fallback? This is the real quality metric your users experience.
-Cost per successful request -- Fallbacks to more expensive models inflate costs. Track this to catch budget overruns before they become a problem.
-Wrapping Up
+Taxa de novas tentativas por provedor – pico acima de 20%? Algo está degradado a montante. Defina alertas.
+Taxa de ativação de fallback – Se o seu modelo principal falhar mais de 10% das vezes, reconsidere a escolha do seu provedor.
+Mudanças no estado do disjuntor – Cada transição ABRIR/FECHAR deve acionar um alerta. Ciclismo frequente significa uma dependência instável.
+Distribuição do nível de degradação – Qual porcentagem de respostas é servida a partir do cache ou do fallback estático? Esta é a verdadeira métrica de qualidade que seus usuários experimentam.
+Custo por solicitação bem-sucedida – Os substitutos para modelos mais caros aumentam os custos. Acompanhe isso para detectar estouros no orçamento antes que se tornem um problema.
+Concluindo
 
-Production AI agents need resilience as a first-class architectural concern, not an afterthought bolted on after the first 2 AM outage. The four patterns in this guide -- retry with backoff, model fallbacks, circuit breakers, and graceful degradation -- form a defense-in-depth strategy that keeps your agents running when everything around them is breaking.
+Os agentes de IA de produção precisam de resiliência como uma preocupação arquitetônica de primeira classe, e não uma reflexão tardia após a primeira interrupção às 2 da manhã. Os quatro padrões neste guia - nova tentativa com espera, fallbacks de modelo, disjuntors e degradação graciosa - formam uma estratégia de defesa profunda que mantém seus agentes em execução quando tudo ao seu redor está quebrando.
 
-The code in this article is framework-agnostic Python you can drop into any project. Start with retry + classify (the highest-ROI pattern), add fallback chains when you depend on a single provider, and layer in circuit breakers when your agents call external tools at scale.
+O código neste artigo é Python independente de estrutura, que você pode inserir em qualquer projeto. Comece com repetir + classificar (o padrão de ROI mais alto), adicione cadeias fallback quando você depender de um único provedor e coloque em camadas disjuntoress quando seus agentes chamarem ferramentas externas em grande escala.
 
-If you want to skip building this resilience plumbing yourself, platforms like Nebula handle retry logic, model fallbacks, and tool circuit breakers at the infrastructure level -- so you can focus on what your agent does instead of how it recovers.
+Se você quiser pular a construção desse encanamento de resiliência por conta própria, plataformas como Nebula lidam com lógica retry, fallbacks de modelos e disjuntoress de ferramentas no nível da infraestrutura - para que você possa se concentrar no que seu agente faz em vez de como ele se recupera.
 
-The complete code from this article is ready to copy-paste. Build something resilient.
+O código completo deste artigo está pronto para copiar e colar. Construa algo resiliente.
 
-The God Agent Anti-Pattern: Why Your AI Breaks at 20 Tools
-Your AI Agent Has Amnesia: Fix It With These 4 Memory Patterns
+O antipadrão do agente de Deus: por que sua IA quebra com 20 ferramentas
+Seu agente de IA está com amnésia: conserte-o com estes 4 padrões de memória
 ...
-22 more parts...
-AI Agent Error Handling: 4 Resilience Patterns in Python
-The 5-Layer Security Model Every AI Agent Needs in Production
-Building Custom MCP Servers: A Developer's Guide to Production-Grade AI Agent Tools
+Mais 22 peças...
+Tratamento de erros do agente AI: 4 padrões de resiliência em Python
+O modelo de segurança de 5 camadas que todo agente de IA precisa na produção
+Construindo servidores MCP personalizados: um guia do desenvolvedor para ferramentas de agente de IA de nível de produção

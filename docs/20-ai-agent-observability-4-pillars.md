@@ -27,6 +27,7 @@ Per-Run Cost Attribution
 Every agent execution needs unique identifiers: trace ID, session ID, and agent ID. Each LLM call and tool invocation gets tagged with these identifiers so you can attribute cost at any granularity.
 
 
+```python
 import time
 from dataclasses import dataclass, field
 from typing import Optional
@@ -41,11 +42,13 @@ agent_id: str
 input_tokens: int = 0
 output_tokens: int = 0
 cost_usd: float = 0.0
+```
 
 # Pricing config — update per model
 input_cost_per_1k: float = 0.003  # Sonnet 4 input
 output_cost_per_1k: float = 0.015  # Sonnet 4 output
 
+```python
 def record(self, input_tok: int, output_tok: int) -> float:
 \"\"\"Record a single LLM call. Returns the cost.\"\"\"
 self.input_tokens += input_tok
@@ -60,12 +63,14 @@ return call_cost
 def running_cost(self) -> float:
 return self.cost_usd
 
+```
 
 Integrated into an agent loop with a hard budget:
 
 
 MAX_RUN_COST = 0.50  # Hard cap per agent session
 
+```python
 ledger = TokenLedger(
 trace_id=\"trace_abc123\",
 session_id=\"sess_xyz789\",
@@ -90,10 +95,12 @@ output_tok=response.usage.output_tokens,
 # ... process response ...
 
 Real-Time Anomaly Alerts
+```
 
 Budget caps prevent catastrophic runs. Anomaly detection catches creeping cost increases before they blow past the cap.
 
 
+```python
 from collections import deque
 import time
 
@@ -109,9 +116,11 @@ def record_burn(self, tokens_per_second: float) -> Optional[str]:
 \"\"\"Returns alert message if anomaly detected, else None.\"\"\"
 now = time.time()
 self.burn_rates.append((now, tokens_per_second))
+```
 
 # Prune old entries
 cutoff = now - self.window
+```python
 self.burn_rates = deque(
 (ts, rate) for ts, rate in self.burn_rates if ts >= cutoff
 )
@@ -128,6 +137,7 @@ f\"({avg_rate:.0f} tps)\"
 )
 return None
 
+```
 
 The alert fires within seconds — not when the monthly bill arrives. I run this as a sidecar process that polls the agent's ledger every 10 seconds and fires a Slack webhook if the burn rate spikes.
 
@@ -140,6 +150,7 @@ Canary Query Suite
 Pick 10-20 queries with known-correct answers. Run them every 5 minutes. Alert when accuracy drops below 90%.
 
 
+```python
 from dataclasses import dataclass
 
 @dataclass
@@ -174,8 +185,10 @@ response = agent.run(q.question)
 # LLM-as-judge evaluation
 judge_result = llm.ask(
 f\"{q.evaluation_prompt}\
+```
 \
 Agent response: {response}\"
+```python
 )
 passed = \"yes\" in judge_result.text.lower()
 results[q.question] = passed
@@ -183,6 +196,7 @@ results[q.question] = passed
 pass_rate = sum(results.values()) / len(results)
 return {\"pass_rate\": pass_rate, \"details\": results}
 
+```
 
 If pass_rate drops below 0.9, something changed: a model provider degraded, a tool API changed its response format, or a prompt update broke something. The canary suite catches it before customers notice.
 
@@ -191,6 +205,7 @@ Semantic Drift Detection
 Beyond binary pass/fail, track whether the agent's responses are becoming less semantically similar to historical good answers. This catches the slow degradation that canary queries might miss.
 
 
+```python
 import numpy as np
 from sentence_transformers import SentenceTransformer
 
@@ -207,6 +222,7 @@ np.dot(current_embeddings, self.baseline_embeddings.T), axis=1
 )
 return float(np.mean(similarities))  # 1.0 = identical, 0.0 = unrelated
 
+```
 
 Drift below 0.7 means the agent's output style or content has fundamentally shifted — time to roll back and investigate.
 
@@ -220,6 +236,7 @@ Every agent action produces structured telemetry. Not text logs that require reg
 
 
 {
+```python
 \"timestamp\": \"2026-04-30T04:23:45Z\",
 \"trace_id\": \"trace_abc123\",
 \"span_id\": \"span_001\",
@@ -237,6 +254,7 @@ Every agent action produces structured telemetry. Not text logs that require reg
 \"parent_span_id\": null
 }
 
+```
 
 The key fields beyond standard logging:
 
@@ -248,6 +266,7 @@ Tool-Call Attribution
 When your database monitoring fires for \"10,000 queries in 5 minutes,\" you need to know which agent triggered them and why. Every tool call traces back to a specific reasoning step.
 
 
+```python
 class ToolCallTracker:
 def __init__(self, max_calls_per_tool: int = 50):
 self.max_calls = max_calls_per_tool
@@ -271,6 +290,7 @@ f\"(limit {self.max_calls})\"
 def get_distribution(self) -> dict[str, int]:
 return dict(self.call_counts)
 
+```
 
 This pairs with the cost ledger: you can see not just how much the agent spent, but which tool drove the spend. If search_database accounts for 80% of tool calls, the agent might be over-relying on retrieval when a simpler tool would suffice.
 
@@ -283,6 +303,7 @@ The Dependency Health Map
 Your health check shouldn't just return {\"status\": \"ok\"}. It should test each dependency and report granular status:
 
 
+```python
 async def agent_health_check(agent) -> dict:
 start = time.time()
 
@@ -318,6 +339,7 @@ s == \"healthy\" for s in tools_status.values()
 \"uptime_seconds\": agent.uptime(),
 }
 
+```
 
 This endpoint runs every 60 seconds and feeds into your monitoring dashboard. When the vector database goes down, you see vector_search: \"error: ConnectionRefusedError\" instead of wondering why the agent's accuracy dropped 40%.
 
@@ -329,6 +351,7 @@ The fix is distributed tracing across agent boundaries. Each agent execution bec
 
 
 trace: user-query-abc123
+```python
 ├── span: agent.research (2.4s, $0.12)
 │   ├── span: gen_ai.chat — query planning (0.3s)
 │   ├── span: tool.vector_search (0.8s)
@@ -341,6 +364,7 @@ trace: user-query-abc123
 ├── span: gen_ai.chat — quality check (0.8s)
 └── span: gen_ai.chat — scoring (0.3s)
 
+```
 
 This trace answers the questions that flat LLM logging cannot: which agent was slowest, which agent was most expensive, what data flowed between agents, and where the chain broke.
 
@@ -450,7 +474,6 @@ The agent observability gap isn't a technology problem — it's a mental model s
 
 This article is part of the Building Production AI Agents series on Dev.to.
 
-Building Production AI Agents (26 Part Series)
 The God Agent Anti-Pattern: Why Your AI Breaks at 20 Tools
 Your AI Agent Has Amnesia: Fix It With These 4 Memory Patterns
 ...
@@ -458,12 +481,3 @@ Your AI Agent Has Amnesia: Fix It With These 4 Memory Patterns
 AI Agent Observability: The 4 Pillars That Keep Your Agents from Burning $2,000 at 3 AM
 The 5-Layer Security Model Every AI Agent Needs in Production
 Building Custom MCP Servers: A Developer's Guide to Production-Grade AI Agent Tools
-DEV Community
-
-Work through these 3 parts to earn the exclusive Google AI Studio Builder badge!
-
-This track will guide you through Google AI Studio's new \"Build apps with Gemini\" feature, where you can turn a simple text prompt into a fully functional, deployed web application in minutes.
-
-Read more →
-
-Read More

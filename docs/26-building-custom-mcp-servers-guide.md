@@ -41,6 +41,7 @@ The official TypeScript SDK is the most widely adopted way to build MCP servers.
 
 
 // server.ts
+```python
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
@@ -135,6 +136,7 @@ throw new Error(`Unknown tool: ${request.params.name}`);
 const transport = new StdioServerTransport();
 await server.connect(transport);
 
+```
 
 This is the skeleton. Every MCP server follows this pattern: declare capabilities, define tool schemas, implement handlers, connect a transport.
 
@@ -154,18 +156,21 @@ Your tool description is the agent's documentation. Be explicit about when to us
 
 
 {
+```python
 name: "deploy_service",
 description:
 "Deploy a service to the staging environment. Use when the user asks to deploy, push to staging, or test a deployment. Does NOT deploy to production — use deploy_to_production for that. Requires the service to have passed CI checks.",
 }
 
 Input Schema Design
+```
 
 Keep required parameters minimal. Agents get confused by complex schemas with many required fields. Use sensible defaults wherever possible.
 
 
 {
 inputSchema: {
+```python
 type: "object",
 properties: {
 serviceName: {
@@ -186,6 +191,7 @@ required: ["serviceName"],
 },
 }
 
+```
 
 One required field, optional parameters with clear defaults. The agent can succeed with minimal information and ask for more when needed.
 
@@ -195,6 +201,7 @@ Stdio transport is fine for local development (Claude Desktop, VS Code), but for
 
 
 // http-server.ts
+```python
 import express from "express";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
@@ -235,6 +242,7 @@ app.listen(3000, () => {
 console.log("MCP server listening on port 3000");
 });
 
+```
 
 The key advantage of Streamable HTTP over SSE is that connections are short-lived and stateless. Each request-response pair is independent, making it trivial to deploy behind load balancers and auto-scaling groups.
 
@@ -265,6 +273,7 @@ Tool-Level Approval Gates
 For sensitive operations, add an approval layer:
 
 
+```python
 const sensitiveTools = ["delete_resource", "modify_production_config"];
 
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
@@ -284,12 +293,14 @@ isError: false,
 });
 
 Input Validation with Zod
+```
 
 Never trust the model's arguments. Even well-behaved agents can hallucinate parameter shapes:
 
 
 const args = z
 .object({
+```python
 email: z.string().email(),
 template: z.string().min(1).max(100),
 variables: z.record(z.string()),
@@ -312,6 +323,7 @@ max: 100,
 app.use("/mcp", limiter);
 
 Deployment Options
+```
 Approach	Best For	Transport
 Local stdio	Development, personal tools	stdio
 Docker + reverse proxy	Internal team tools	Streamable HTTP
@@ -334,19 +346,9 @@ Use Streamable HTTP for production
 Always validate inputs with Zod
 Test every tool with MCP Inspector
 MCP servers are the tool layer; orchestrators like Nebula handle routing and state
-Building Production AI Agents (26 Part Series)
 The God Agent Anti-Pattern: Why Your AI Breaks at 20 Tools
 Your AI Agent Has Amnesia: Fix It With These 4 Memory Patterns
 ...
 22 more parts...
 The 5-Layer Security Model Every AI Agent Needs in Production
 Building Custom MCP Servers: A Developer's Guide to Production-Grade AI Agent Tools
-DEV Community
-
-Build Apps with Google AI Studio 🧱
-
-This track will guide you through Google AI Studio's new "Build apps with Gemini" feature, where you can turn a simple text prompt into a fully functional, deployed web application in minutes.
-
-Read more →
-
-Read More

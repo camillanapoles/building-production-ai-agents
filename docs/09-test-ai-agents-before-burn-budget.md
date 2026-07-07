@@ -43,6 +43,7 @@ Mock the LLM. Test the skeleton.
 
 from unittest.mock import MagicMock
 
+```python
 def test_agent_routes_search_queries():
 """Agent should select web_search for factual questions."""
 mock_llm = MagicMock()
@@ -73,6 +74,7 @@ result = agent.plan("Clean up old records")
 assert result.status == "requires_confirmation"
 assert result.selected_tool != "delete_database"  # Should be blocked
 
+```
 
 Skeleton tests run in milliseconds because they never call an LLM API. They catch the bugs that matter most: routing logic that sends queries to the wrong tool, missing safety checks on destructive operations, and state management that drops context between steps.
 
@@ -83,6 +85,7 @@ Pattern 2: Golden Path Replay Testing
 Once your agent handles a task correctly, record the entire execution trace -- inputs, tool calls, intermediate results, and final output. That recording becomes a regression test.
 
 
+```python
 import json
 from pathlib import Path
 from difflib import SequenceMatcher
@@ -119,6 +122,7 @@ assert trace.total_cost <= golden["cost"] * 1.5, (
 f"Cost regression: ${trace.total_cost:.2f} vs golden ${golden['cost']:.2f}"
 )
 
+```
 
 Golden path tests answer one question: "Does the agent still work the way it did when we last verified it?" Run them before every model upgrade, after prompt changes, and as a weekly regression suite.
 
@@ -131,6 +135,7 @@ This is the most valuable pattern in this article. Instead of asserting what the
 Every production agent has invariants -- properties that must hold true regardless of input. Write them down. Then write tests that enforce them.
 
 
+```python
 from dataclasses import dataclass
 from typing import Callable
 
@@ -199,6 +204,7 @@ f"{[v['property'] for v in critical]}"
 
 
 Property-based testing catches the failures that scare you most: the agent that silently deletes production data, the agent that spends $50 on a single request, the agent that cites a URL that doesn't exist. These are the failures that erode trust and cost real money.
+```
 
 Start with three properties: no destructive actions without confirmation, budget cap per request, and maximum reasoning steps. Add more as you discover new failure modes in production.
 
@@ -207,6 +213,7 @@ Pattern 4: Budget Tripwire Tests
 Dedicated tests for the most expensive failure mode: agent loops. An agent that enters a reasoning loop will keep calling the LLM until something stops it. If nothing stops it, your bill does.
 
 
+```python
 import time
 
 def test_ambiguous_query_does_not_loop():
@@ -252,6 +259,7 @@ f"Request exceeded budget: ${result.cost:.2f} for: {prompt[:50]}..."
 
 
 The $153 incident from the intro? A single budget tripwire test would have caught it. The agent entered a loop because nobody tested what happens when the LLM can't resolve ambiguity. A two-line assertion -- iterations < 10 and cost < 1.00 -- would have flagged it before deployment.
+```
 
 Budget tripwires are slow (they actually run the agent), so run them nightly or before releases rather than on every commit.
 
@@ -260,6 +268,7 @@ Pattern 5: LLM-as-Judge Evaluation
 When output quality matters -- summaries, recommendations, analysis -- you need a judge that understands language. Use a second LLM to evaluate the first.
 
 
+```python
 import openai
 
 def llm_judge(output: str, criteria: str, context: str = "") -> int:
@@ -272,11 +281,13 @@ messages=[{
 
 Criteria: {criteria}
 {f'Context: {context}' if context else ''}
+```
 
 Agent output:
 {output}
 
 Respond with ONLY a single integer 1-5."""
+```python
 }],
 temperature=0,
 )
@@ -301,6 +312,7 @@ assert scores["conciseness"] >= 3, f"Too verbose: {scores['conciseness']}/5"
 A caveat: LLM judges have their own biases. GPT-4 tends to rate GPT-4 output generously. Use LLM-as-judge for directional quality tracking ("is this getting better or worse?") rather than absolute pass/fail decisions. Cross-validate with human review on a sample of outputs periodically.
 
 Putting It All Together
+```
 
 You don't need all five patterns on day one. Here's a decision table:
 
@@ -325,7 +337,6 @@ Platforms like Nebula build several of these patterns into the agent runtime its
 
 But you don't need any platform to start. Write three property assertions today. Test what your agent must never do. That's the highest-ROI testing investment you'll make this quarter.
 
-Building Production AI Agents (26 Part Series)
 The God Agent Anti-Pattern: Why Your AI Breaks at 20 Tools
 Your AI Agent Has Amnesia: Fix It With These 4 Memory Patterns
 ...
@@ -333,12 +344,3 @@ Your AI Agent Has Amnesia: Fix It With These 4 Memory Patterns
 How to Test AI Agents (Before They Burn Your Budget)
 The 5-Layer Security Model Every AI Agent Needs in Production
 Building Custom MCP Servers: A Developer's Guide to Production-Grade AI Agent Tools
-DEV Community
-
-Build Apps with Google AI Studio 🧱
-
-This track will guide you through Google AI Studio's new "Build apps with Gemini" feature, where you can turn a simple text prompt into a fully functional, deployed web application in minutes.
-
-Read more →
-
-Read More

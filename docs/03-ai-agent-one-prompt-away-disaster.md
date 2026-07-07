@@ -35,6 +35,7 @@ The pattern is straightforward: classify and sanitize every external input befor
 Here is a dual-layer input classifier that combines regex pattern matching with semantic analysis:
 
 
+```python
 import re
 from dataclasses import dataclass
 
@@ -65,9 +66,11 @@ normalized = text.lower().strip()
 for pattern in INJECTION_PATTERNS:
 if re.search(pattern, normalized, re.IGNORECASE):
 flags.append(f\"pattern_match: {pattern}\")
+```
 
 # Layer 2: Structural heuristics
 if normalized.count(\"ignore\") > 2:
+```python
 flags.append(\"repeated_ignore_keyword\")
 if \"---\" in text and any(
 kw in text.upper()
@@ -89,6 +92,7 @@ if not result.is_safe:
 log_security_event(result)
 return \"Input blocked: suspicious content detected.\"
 
+```
 
 The regex layer catches known attack signatures in under a millisecond. The heuristic layer catches structural patterns that regex alone misses -- like fake system delimiters embedded in documents.
 
@@ -101,6 +105,7 @@ Every tool you give an agent is an attack surface. The pattern here is strict: g
 This sounds obvious. In practice, developers hand agents broad tool access because it is easier than defining granular permissions. A reporting agent gets full database access instead of read-only. A scheduling agent gets email-send permissions it never needs. When that agent gets compromised -- through injection or hallucination -- the damage is bounded only by its permissions.
 
 
+```python
 # Bad: agent gets everything
 agent = Agent(
 tools=[db_read, db_write, db_delete, send_email,
@@ -121,6 +126,7 @@ max_tool_calls=5,
 blocked_actions=[\"delete_ticket\", \"modify_user\"],
 )
 
+```
 
 The principle extends to multi-agent systems. When one agent delegates to another, the delegated agent should not inherit the parent's full permission set. Each agent in a delegation chain needs its own scoped tool list.
 
@@ -135,6 +141,7 @@ Input filtering catches attacks before they reach the agent. Output validation c
 The pattern is a three-tier action classification system: auto-approve reads, log writes, and require human confirmation for destructive actions.
 
 
+```python
 from enum import Enum
 
 class ActionRisk(Enum):
@@ -177,6 +184,7 @@ return approved
 
 return False  # Unknown actions are blocked by default
 
+```
 
 The key detail: unknown actions default to blocked. If your agent hallucinates a tool call that is not in your classification map, it gets stopped. This is a much safer default than auto-approving anything the agent decides to do.
 
@@ -191,6 +199,7 @@ In multi-agent systems, a security breach in one agent can cascade through the e
 The problem shows up in two ways. First, Agent A reads Agent B's memory -- a customer-facing agent accesses internal tool configurations from a backend agent. Second, internal context leaks into external outputs -- an agent includes system prompt fragments or API keys in a user-facing response.
 
 
+```python
 class MemoryScope(Enum):
 GLOBAL = \"global\"      # Shared across all agents (rare)
 AGENT = \"agent\"        # Private to one agent
@@ -237,6 +246,7 @@ r\"SYSTEM PROMPT:.*?(?=\
 
 user_response = sanitize_output(agent_output, SENSITIVE)
 
+```
 
 The memory scope model ensures that each agent's context stays private by default. Global memory exists for genuinely shared data (like user preferences), but private agent state -- tool configurations, intermediate reasoning, internal API responses -- stays isolated.
 
@@ -247,6 +257,7 @@ Pattern 5: Audit Logging and Kill Switches
 You cannot secure what you cannot see. Every agent action -- every tool call, every decision, every input processed -- needs to be logged.
 
 
+```python
 import time
 import json
 from datetime import datetime, timezone
@@ -308,6 +319,7 @@ result=step.result,
 duration_ms=step.duration,
 )
 
+```
 
 The kill switch is not sophisticated. It does not need to be. If an agent is making 50 tool calls in 60 seconds, something is wrong -- whether it is a prompt injection, a logic loop, or a hallucination spiral. Halt first, investigate second.
 
@@ -342,7 +354,6 @@ If you are building production agents and want these patterns built in, Nebula h
 
 This is part of the Building Production AI Agents series. Previous articles cover agent memory patterns, tool management, and production failure modes -- each one connects to the security architecture we built here.
 
-Building Production AI Agents (26 Part Series)
 The God Agent Anti-Pattern: Why Your AI Breaks at 20 Tools
 Your AI Agent Has Amnesia: Fix It With These 4 Memory Patterns
 ...
@@ -350,12 +361,3 @@ Your AI Agent Has Amnesia: Fix It With These 4 Memory Patterns
 Your AI Agent Is One Prompt Away From Disaster
 The 5-Layer Security Model Every AI Agent Needs in Production
 Building Custom MCP Servers: A Developer's Guide to Production-Grade AI Agent Tools
-DEV Community
-
-Build Apps with Google AI Studio 🧱
-
-This track will guide you through Google AI Studio's new \"Build apps with Gemini\" feature, where you can turn a simple text prompt into a fully functional, deployed web application in minutes.
-
-Read more →
-
-Read More

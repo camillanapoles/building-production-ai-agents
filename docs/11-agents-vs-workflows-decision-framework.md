@@ -21,6 +21,7 @@ Both agents and workflows can use LLMs. Both can call APIs. Both can automate mu
 A workflow follows a path defined at design time. You draw the flowchart, write the branches, and the runtime executes exactly what you specified. Step A always leads to Step B. If the input matches condition X, take the left branch. The execution path is deterministic — you can predict it by reading the code.
 
 
+```python
 # Workflow: the developer decides the path
 def process_order(order):
 validated = validate_order(order)        # Step 1 — always
@@ -31,10 +32,12 @@ else:
 fulfill_order(enriched)              # Branch B
 send_confirmation(enriched)              # Step 3 — always
 
+```
 
 An agent follows a path decided at runtime. You give it a goal, tools, and context. The LLM reasons about what to do next based on what just happened. The path emerges from the interaction — you cannot draw the flowchart in advance because it depends on intermediate results.
 
 
+```python
 # Agent: the LLM decides the path
 def handle_support_ticket(ticket):
 agent = Agent(
@@ -46,6 +49,7 @@ tools=[search_docs, check_account, query_logs, respond, escalate]
 # The path depends on what it finds at each step.
 return agent.run(ticket)
 
+```
 
 There is also a middle ground that most teams overlook: a workflow with agent steps. The orchestration is deterministic — Step 1, then Step 2, then Step 3 — but one or more steps use an LLM to handle ambiguity within a bounded scope. This is what most production systems actually look like, and it is the pattern you should default to.
 
@@ -93,6 +97,7 @@ The most effective architecture in production is not pure workflow or pure agent
 Consider a customer support pipeline:
 
 
+```python
 def support_pipeline(ticket):
 # Step 1: Agent — classify the ticket (needs judgment)
 classification = classify_agent.run(
@@ -127,14 +132,17 @@ return {\"classification\": classification, \"channel\": channel, \"draft\": dra
 
 
 Steps 1 and 3 are agents — they handle ambiguity. Steps 2 and 4 are workflow — they are predictable and cheap. The workflow controls the overall sequencing so you can audit exactly what happened. The agents handle the parts that require judgment, within bounded scope.
+```
 
 This pattern gives you three things no pure architecture can:
 
+```python
 Auditability at the system level (the workflow logs every step)
 Flexibility where you need it (agents reason about ambiguous inputs)
 Bounded blast radius when an agent does something unexpected (the workflow catches it at the next deterministic step)
 Three Anti-Patterns That Cost Teams Months
 The God Agent
+```
 
 You give one agent 15+ tools and a vague goal: \"Handle customer requests.\" It works in demos because your test inputs are clean. In production, it picks the wrong tool 20% of the time, chains tool calls in ways you did not anticipate, and occasionally sends a customer a Slack message meant for your internal channel.
 
@@ -173,9 +181,11 @@ Workflow: send + log
 The classification and response steps require judgment — a billing complaint about an unauthorized charge is different from a question about pricing, even though both mention \"charges.\" The routing and delivery are deterministic. Decision tree stops at Question 4.
 
 Code Review Automation → Agent-Heavy
+```python
 PR opened → [Agent: read diff, check patterns, query docs,
 assess risk, write review comments]
 
+```
 
 The agent needs to reason about what it sees in the diff. A security issue requires different analysis than a performance concern. The investigation path depends on the code — you cannot predefine it. Decision tree reaches Question 5, but scope is bounded (one PR, read-only actions plus comments), so it stays manageable.
 
@@ -214,7 +224,6 @@ The default answer is a workflow. The burden of proof is on the agent — it nee
 
 Start with a workflow. Add agent steps only where you need judgment. Measure the cost and accuracy of each agent step independently. And never go full autonomous agent on day one — you will regret it by day three.
 
-Building Production AI Agents (26 Part Series)
 The God Agent Anti-Pattern: Why Your AI Breaks at 20 Tools
 Your AI Agent Has Amnesia: Fix It With These 4 Memory Patterns
 ...
@@ -222,12 +231,3 @@ Your AI Agent Has Amnesia: Fix It With These 4 Memory Patterns
 Agents vs Workflows: A Decision Framework for 2026
 The 5-Layer Security Model Every AI Agent Needs in Production
 Building Custom MCP Servers: A Developer's Guide to Production-Grade AI Agent Tools
-DEV Community
-
-Build Apps with Google AI Studio 🧱
-
-This track will guide you through Google AI Studio's new \"Build apps with Gemini\" feature, where you can turn a simple text prompt into a fully functional, deployed web application in minutes.
-
-Read more →
-
-Read More

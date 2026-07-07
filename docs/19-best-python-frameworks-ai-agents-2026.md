@@ -37,6 +37,7 @@ You're building an agent with a defined workflow that branches based on LLM outp
 
 
 from langgraph.graph import StateGraph, START, END
+```python
 from typing import TypedDict
 
 class AgentState(TypedDict):
@@ -57,6 +58,7 @@ graph.add_edge("auto_fix", END)
 graph.add_edge("escalate", END)
 
 app = graph.compile()
+```
 
 2. LangChain — Best for Quick Prototypes
 
@@ -137,6 +139,7 @@ When to Pick It
 You're building the tool layer — exposing APIs, databases, or internal systems to AI agents. Write an MCP server, and your tools work with every MCP client out of the box.
 
 
+```python
 from fastmcp import FastMCP
 
 mcp = FastMCP("data-tools")
@@ -151,6 +154,7 @@ return execute_query(sql)
 mcp.run()
 
 Decision Framework
+```
 
 Pick based on your starting point:
 
@@ -164,7 +168,6 @@ My production pattern: MCP SDK for the tool layer (expose internal APIs, databas
 
 This article is part of the Building Production AI Agents series on Dev.to.
 
-Building Production AI Agents (26 Part Series)
 The God Agent Anti-Pattern: Why Your AI Breaks at 20 Tools
 Your AI Agent Has Amnesia: Fix It With These 4 Memory Patterns
 ...
@@ -172,12 +175,3 @@ Your AI Agent Has Amnesia: Fix It With These 4 Memory Patterns
 7 Best Python Frameworks for Building AI Agents in 2026
 The 5-Layer Security Model Every AI Agent Needs in Production
 Building Custom MCP Servers: A Developer's Guide to Production-Grade AI Agent Tools
-DEV Community
-
-Build Apps with Google AI Studio 🧱
-
-This track will guide you through Google AI Studio's new "Build apps with Gemini" feature, where you can turn a simple text prompt into a fully functional, deployed web application in minutes.
-
-Read more →
-
-Read More
